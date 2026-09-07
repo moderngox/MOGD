@@ -1,6 +1,6 @@
 import { getDb } from "@mogd/db";
 import { exercises } from "@mogd/domain";
-import { loadMediaEnv, exerciseAssetPublicUrl } from "@mogd/media";
+import { loadMediaEnv } from "@mogd/media";
 import { MediaManager } from "./MediaManager";
 
 export default async function AdminMediaPage({
@@ -16,17 +16,14 @@ export default async function AdminMediaPage({
 
   const env = loadMediaEnv();
   const assets = selected ? await exercises.listAssetsForExercise(db, selected.id) : [];
+  // Build the preview URL from the asset's own stored objectKey — never
+  // recompute a key from the DB row's id. The uploaded object's key was
+  // built at upload time from a *different* random id (baked into the R2
+  // path before the draft row existed), so re-deriving it from asset.id
+  // here would silently point at an object that doesn't exist.
   const assetsWithPreview = assets.map((asset) => ({
     ...asset,
-    previewUrl:
-      env && (asset.type === "video" || asset.type === "thumbnail")
-        ? exerciseAssetPublicUrl(env, {
-            exerciseId: asset.exerciseId,
-            assetId: asset.id,
-            type: asset.type,
-            extension: asset.objectKey.endsWith(".jpg") ? "jpg" : "mp4",
-          })
-        : null,
+    previewUrl: env ? `${env.R2_EXERCISE_MEDIA_PUBLIC_BASE_URL}/${asset.objectKey}` : null,
   }));
 
   return (
