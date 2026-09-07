@@ -1,0 +1,9 @@
+@import "tailwindcss";
+@source "../../../../packages/ui/src";
+
+/* No finalized token/typography spec yet — see design.md. This sets only
+   the minimum needed for a readable dark placeholder UI. */
+body {
+  background-color: #09090b;
+  color: #f4f4f5;
+}
