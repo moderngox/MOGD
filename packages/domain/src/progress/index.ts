@@ -1,5 +1,10 @@
 /**
- * progress — measurements, workout logs and trend calculation domain
- * boundary. Implemented in M4-M5 per docs/ARCHITECTURE.md §14 and §17.
+ * progress — set logging and previous-performance domain boundary
+ * (docs/ARCHITECTURE.md §14).
  */
-export {};
+export { logWorkoutSet, logSetInput, type LogSetInput } from "./logSet";
+export {
+  getPreviousPerformance,
+  getProgressionTargetForExercise,
+  type PreviousPerformance,
+} from "./previousPerformance";

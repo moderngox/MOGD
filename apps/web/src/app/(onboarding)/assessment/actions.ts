@@ -2,7 +2,7 @@
 
 import { auth } from "@/auth";
 import { getDb } from "@mogd/db";
-import { assessment, nutrition } from "@mogd/domain";
+import { assessment, nutrition, programs } from "@mogd/domain";
 import { loadMediaEnv, getPrivatePhotoUploadUrl, privatePhotoObjectKey } from "@mogd/media";
 
 export interface PhotoUploadUrlResult {
@@ -68,4 +68,19 @@ export async function generateStrategyAction(): Promise<nutrition.GenerateStrate
   }
 
   return nutrition.generateStrategyAndNutrition(getDb(), session.user.id);
+}
+
+/**
+ * Called after a successful generateStrategyAction — "receive weekly
+ * workouts" in docs/PRODUCT.md §15 follows directly from having a
+ * strategy. Kept as its own action for the same reason: each milestone's
+ * module stays self-contained rather than reaching back into earlier ones.
+ */
+export async function generateProgramAction(): Promise<programs.GenerateProgramResult> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    throw new Error("Not authenticated");
+  }
+
+  return programs.generateProgram(getDb(), session.user.id);
 }

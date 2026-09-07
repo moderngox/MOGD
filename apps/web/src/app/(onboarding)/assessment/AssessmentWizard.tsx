@@ -4,7 +4,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Checkbox, Input, Select, Textarea } from "@mogd/ui";
 import { assessment, physique } from "@mogd/domain";
-import { getPhotoUploadUrlAction, submitAssessmentAction, generateStrategyAction } from "./actions";
+import {
+  getPhotoUploadUrlAction,
+  submitAssessmentAction,
+  generateStrategyAction,
+  generateProgramAction,
+} from "./actions";
 
 type AssessmentSubmission = assessment.AssessmentSubmission;
 
@@ -169,11 +174,13 @@ export function AssessmentWizard({ photosAvailable }: { photosAvailable: boolean
         return;
       }
 
-      // Best-effort: an extreme edge case can fail nutrition validation
-      // (see packages/domain/src/nutrition/validate.ts) even though the
-      // assessment itself was accepted. The dashboard handles a missing
-      // target gracefully rather than blocking onboarding on this.
+      // Best-effort: an extreme edge case can fail nutrition/program
+      // validation (see packages/domain/src/nutrition/validate.ts and
+      // src/programs/validator.ts) even though the assessment itself was
+      // accepted. The dashboard handles a missing target/program
+      // gracefully rather than blocking onboarding on this.
       await generateStrategyAction().catch(() => undefined);
+      await generateProgramAction().catch(() => undefined);
 
       router.push("/dashboard");
     } catch {

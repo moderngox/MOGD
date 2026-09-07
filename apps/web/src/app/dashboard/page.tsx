@@ -1,7 +1,8 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth, signOut } from "@/auth";
 import { getDb } from "@mogd/db";
-import { assessment, nutrition } from "@mogd/domain";
+import { assessment, nutrition, programs } from "@mogd/domain";
 import { Button } from "@mogd/ui";
 
 export default async function DashboardPage() {
@@ -18,6 +19,7 @@ export default async function DashboardPage() {
 
   const strategy = await nutrition.getGoalStrategy(db, session.user.id);
   const target = await nutrition.getNutritionTarget(db, session.user.id);
+  const program = await programs.getCurrentProgram(db, session.user.id);
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-4 p-8">
@@ -68,9 +70,15 @@ export default async function DashboardPage() {
         <dd className="text-zinc-100">{summary.waistCm} cm</dd>
       </dl>
 
-      <p className="text-sm text-zinc-500">
-        Weekly workouts and adaptation land in later milestones.
-      </p>
+      {program ? (
+        <Link href="/program">
+          <Button>View program ({program.workouts.length} sessions/week)</Button>
+        </Link>
+      ) : (
+        <p className="text-sm text-zinc-500">Program not available yet.</p>
+      )}
+
+      <p className="text-sm text-zinc-500">Adaptation lands in later milestones.</p>
 
       <form
         action={async () => {

@@ -29,6 +29,13 @@
       "when": 1788814987832,
       "tag": "0003_goofy_groot",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1788816649240,
+      "tag": "0004_sweet_black_knight",
+      "breakpoints": true
     }
   ]
 }
