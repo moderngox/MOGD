@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth, signOut } from "@/auth";
 import { getDb } from "@mogd/db";
-import { assessment, nutrition, programs } from "@mogd/domain";
+import { assessment, nutrition, programs, checkins, adaptation } from "@mogd/domain";
 import { Button } from "@mogd/ui";
 
 export default async function DashboardPage() {
@@ -20,6 +20,18 @@ export default async function DashboardPage() {
   const strategy = await nutrition.getGoalStrategy(db, session.user.id);
   const target = await nutrition.getNutritionTarget(db, session.user.id);
   const program = await programs.getCurrentProgram(db, session.user.id);
+  const checkinHistory = await checkins.listCheckins(db, session.user.id);
+  const latestAdjustment = await adaptation.getLatestPlanAdjustment(db, session.user.id);
+
+  const latestCheckin = checkinHistory[0];
+  const weightTrend = adaptation.computeActualWeeklyRateKg(
+    checkinHistory
+      .slice(0, 4)
+      .map((c) => ({ averageWeightKg: c.averageWeightKg, completedAt: c.completedAt })),
+  );
+
+  const currentWeightKg = latestCheckin?.averageWeightKg ?? summary.weightKg;
+  const currentWaistCm = latestCheckin?.waistCm ?? summary.waistCm;
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-4 p-8">
@@ -64,21 +76,34 @@ export default async function DashboardPage() {
         )}
 
         <dt className="text-zinc-500">Weight</dt>
-        <dd className="text-zinc-100">{summary.weightKg} kg</dd>
+        <dd className="text-zinc-100">
+          {currentWeightKg} kg
+          {weightTrend !== null && (
+            <span className="text-zinc-500"> ({weightTrend >= 0 ? "+" : ""}{weightTrend.toFixed(2)} kg/wk)</span>
+          )}
+        </dd>
 
         <dt className="text-zinc-500">Waist</dt>
-        <dd className="text-zinc-100">{summary.waistCm} cm</dd>
+        <dd className="text-zinc-100">{currentWaistCm} cm</dd>
       </dl>
 
-      {program ? (
-        <Link href="/program">
-          <Button>View program ({program.workouts.length} sessions/week)</Button>
-        </Link>
-      ) : (
-        <p className="text-sm text-zinc-500">Program not available yet.</p>
+      {latestAdjustment && (
+        <div className="rounded-md border border-zinc-800 p-3">
+          <p className="text-sm text-zinc-500">Adaptation insight</p>
+          <p className="text-sm text-zinc-100">{latestAdjustment.reason}</p>
+        </div>
       )}
 
-      <p className="text-sm text-zinc-500">Adaptation lands in later milestones.</p>
+      <div className="flex gap-3">
+        {program && (
+          <Link href="/program">
+            <Button variant="secondary">View program</Button>
+          </Link>
+        )}
+        <Link href="/checkin">
+          <Button>Weekly check-in</Button>
+        </Link>
+      </div>
 
       <form
         action={async () => {

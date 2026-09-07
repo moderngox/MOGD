@@ -36,6 +36,13 @@
       "when": 1788816649240,
       "tag": "0004_sweet_black_knight",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1788818682336,
+      "tag": "0005_deep_goblin_queen",
+      "breakpoints": true
     }
   ]
 }
