@@ -2,7 +2,7 @@
 
 import { auth } from "@/auth";
 import { getDb } from "@mogd/db";
-import { assessment } from "@mogd/domain";
+import { assessment, nutrition } from "@mogd/domain";
 import { loadMediaEnv, getPrivatePhotoUploadUrl, privatePhotoObjectKey } from "@mogd/media";
 
 export interface PhotoUploadUrlResult {
@@ -52,4 +52,20 @@ export async function submitAssessmentAction(
   }
 
   return assessment.submitAssessment(getDb(), session.user.id, input);
+}
+
+/**
+ * Called right after a successful, eligible submitAssessmentAction — the
+ * "receive strategy" / "receive calorie and macronutrient targets" steps
+ * in docs/PRODUCT.md §15 follow directly from completing the assessment.
+ * Kept as its own action (not folded into submitAssessment itself) so M1's
+ * module stays self-contained; M3 only adds to the flow.
+ */
+export async function generateStrategyAction(): Promise<nutrition.GenerateStrategyResult> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    throw new Error("Not authenticated");
+  }
+
+  return nutrition.generateStrategyAndNutrition(getDb(), session.user.id);
 }

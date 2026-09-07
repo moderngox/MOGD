@@ -1,5 +1,13 @@
 /**
- * nutrition — deterministic BMR/TDEE/target functions domain boundary.
- * Implemented in M3 per docs/ARCHITECTURE.md §16 and docs/AI_AND_SAFETY.md.
+ * nutrition — deterministic BMR/TDEE/target functions domain boundary
+ * (docs/ARCHITECTURE.md §16, docs/AI_AND_SAFETY.md).
  */
-export {};
+export * from "./formulas";
+export * from "./computeNutritionTarget";
+export * from "./validate";
+export {
+  generateStrategyAndNutrition,
+  AssessmentIncompleteError,
+  type GenerateStrategyResult,
+} from "./generateStrategy";
+export { getGoalStrategy, getNutritionTarget } from "./getTargets";

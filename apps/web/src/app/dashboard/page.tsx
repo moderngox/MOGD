@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth, signOut } from "@/auth";
 import { getDb } from "@mogd/db";
-import { assessment } from "@mogd/domain";
+import { assessment, nutrition } from "@mogd/domain";
 import { Button } from "@mogd/ui";
 
 export default async function DashboardPage() {
@@ -10,10 +10,14 @@ export default async function DashboardPage() {
     redirect("/sign-in");
   }
 
-  const summary = await assessment.getUserAssessment(getDb(), session.user.id);
+  const db = getDb();
+  const summary = await assessment.getUserAssessment(db, session.user.id);
   if (!summary) {
     redirect("/assessment");
   }
+
+  const strategy = await nutrition.getGoalStrategy(db, session.user.id);
+  const target = await nutrition.getNutritionTarget(db, session.user.id);
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-4 p-8">
@@ -26,7 +30,9 @@ export default async function DashboardPage() {
 
         <dt className="text-zinc-500">Physique priorities</dt>
         <dd className="text-zinc-100">
-          {summary.physiquePriorities.map((p) => p.replaceAll("_", " ")).join(", ")}
+          {(strategy?.priorityMuscles ?? summary.physiquePriorities)
+            .map((p) => p.replaceAll("_", " "))
+            .join(", ") || "balanced"}
         </dd>
 
         <dt className="text-zinc-500">Training</dt>
@@ -34,10 +40,26 @@ export default async function DashboardPage() {
           {summary.sessionsPerWeek} sessions/week · {summary.sessionDurationMinutes} min
         </dd>
 
-        <dt className="text-zinc-500">Nutrition</dt>
-        <dd className="text-zinc-100">
-          {summary.mealsPerDay} meals/day · {summary.dietaryPreference.replaceAll("_", " ")}
-        </dd>
+        {target ? (
+          <>
+            <dt className="text-zinc-500">Nutrition</dt>
+            <dd className="text-zinc-100">{Math.round(target.energyKcal)} kcal/day</dd>
+
+            <dt className="text-zinc-500">Protein</dt>
+            <dd className="text-zinc-100">{Math.round(target.proteinG)} g/day</dd>
+
+            <dt className="text-zinc-500">Fat</dt>
+            <dd className="text-zinc-100">{Math.round(target.fatG)} g/day</dd>
+
+            <dt className="text-zinc-500">Carbs</dt>
+            <dd className="text-zinc-100">{Math.round(target.carbG)} g/day</dd>
+          </>
+        ) : (
+          <>
+            <dt className="text-zinc-500">Nutrition</dt>
+            <dd className="text-zinc-500">Not available yet</dd>
+          </>
+        )}
 
         <dt className="text-zinc-500">Weight</dt>
         <dd className="text-zinc-100">{summary.weightKg} kg</dd>
@@ -47,7 +69,7 @@ export default async function DashboardPage() {
       </dl>
 
       <p className="text-sm text-zinc-500">
-        Calorie/macro targets, weekly workouts and adaptation land in later milestones.
+        Weekly workouts and adaptation land in later milestones.
       </p>
 
       <form

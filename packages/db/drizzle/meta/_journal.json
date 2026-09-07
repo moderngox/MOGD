@@ -22,6 +22,13 @@
       "when": 1788809215844,
       "tag": "0002_short_franklin_storm",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1788814987832,
+      "tag": "0003_goofy_groot",
+      "breakpoints": true
     }
   ]
 }
