@@ -29,6 +29,7 @@ export interface ProgramView {
   programId: string;
   splitType: string;
   sessionsPerWeek: number;
+  createdAt: Date;
   workouts: ProgramWorkoutView[];
 }
 
@@ -84,6 +85,7 @@ export async function getCurrentProgram(db: Database, userId: string): Promise<P
     programId: program.id,
     splitType: program.splitType,
     sessionsPerWeek: program.sessionsPerWeek,
+    createdAt: program.createdAt,
     workouts,
   };
 }

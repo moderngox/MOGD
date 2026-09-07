@@ -16,3 +16,8 @@ export {
   type ProgramWorkoutView,
   type ProgramWorkoutExerciseView,
 } from "./getProgram";
+export {
+  getWeeklySessionStatus,
+  type WeeklySessionView,
+  type WeeklySessionStatus,
+} from "./getWeeklySessionStatus";

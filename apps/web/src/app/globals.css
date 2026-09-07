@@ -1,9 +1,34 @@
 @import "tailwindcss";
 @source "../../../../packages/ui/src";
 
-/* No finalized token/typography spec yet — see design.md. This sets only
-   the minimum needed for a readable dark placeholder UI. */
+/* Tokens derived from the reviewed Claude Design mockup — see design.md
+   section 1 (Foundations) for the source and rationale behind each value. */
+@theme {
+  --color-bg: #0c0c0c;
+  --color-surface: #161616;
+  --color-surface-alt: #131313;
+  --color-surface-elevated: #1f2021;
+  --color-border: #35383b;
+  --color-border-strong: #777d83;
+  --color-fg: #f0efea;
+  --color-fg-secondary: #8c9095;
+  --color-fg-secondary-alt: #b1b4b8;
+  --color-fg-muted: #5a5e62;
+  --color-accent: #d2f34a;
+  --color-accent-hover: #e4fa85;
+  --color-status-positive: #91d5ac;
+  --color-status-caution: #e7c47b;
+  --color-status-warning: #f19a9a;
+  --color-status-info: #a9c7e8;
+
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+  --font-display: var(--font-barlow-condensed), var(--font-inter), sans-serif;
+
+  --radius-lg: 12px;
+}
+
 body {
-  background-color: #09090b;
-  color: #f4f4f5;
+  background-color: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
 }

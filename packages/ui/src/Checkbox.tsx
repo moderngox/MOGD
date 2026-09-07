@@ -5,17 +5,17 @@ export interface CheckboxProps extends Omit<InputHTMLAttributes<HTMLInputElement
   label: string;
 }
 
-/** Placeholder primitive — see Button.tsx for why this stays unstyled beyond basics. */
+/** design.md section 2 (Components). */
 export function Checkbox({ label, className, id, ...props }: CheckboxProps) {
   return (
     <label
       htmlFor={id}
-      className={cn("flex items-center gap-2 text-sm text-zinc-200", className)}
+      className={cn("flex items-center gap-2 text-sm text-fg-secondary-alt", className)}
     >
       <input
         type="checkbox"
         id={id}
-        className="h-4 w-4 rounded border-zinc-700 bg-zinc-900 accent-zinc-100"
+        className="h-4 w-4 rounded border-border-strong bg-surface accent-accent"
         {...props}
       />
       {label}

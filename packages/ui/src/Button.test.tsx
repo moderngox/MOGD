@@ -17,4 +17,9 @@ describe("Button", () => {
     render(<Button disabled>Start workout</Button>);
     expect(screen.getByRole("button")).toBeDisabled();
   });
+
+  it("renders the outline variant with a transparent background", () => {
+    render(<Button variant="outline">View exercises</Button>);
+    expect(screen.getByRole("button", { name: "View exercises" })).toHaveClass("bg-transparent");
+  });
 });

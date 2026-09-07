@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { getDb } from "@mogd/db";
 import { assessment } from "@mogd/domain";
 import { loadMediaEnv } from "@mogd/media";
+import { SidebarNav } from "@mogd/ui";
 import { CheckinForm } from "./CheckinForm";
 
 export default async function CheckinPage() {
@@ -19,9 +20,19 @@ export default async function CheckinPage() {
   const photosAvailable = loadMediaEnv() !== null;
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-lg flex-col gap-6 p-8">
-      <h1 className="text-2xl font-semibold">Weekly check-in</h1>
-      <CheckinForm photosAvailable={photosAvailable} />
-    </main>
+    <div className="flex min-h-screen">
+      <SidebarNav
+        items={[
+          { href: "/dashboard", label: "Today" },
+          { href: "/program", label: "Training" },
+          { href: "/checkin", label: "Nutrition", active: true },
+          { href: "/checkin", label: "Progress" },
+        ]}
+      />
+      <main className="mx-auto flex w-full max-w-lg flex-col gap-6 px-8 py-10">
+        <h1 className="font-display text-3xl font-semibold text-fg">Weekly check-in</h1>
+        <CheckinForm photosAvailable={photosAvailable} />
+      </main>
+    </div>
   );
 }
