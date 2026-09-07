@@ -12,6 +12,8 @@
   },
   "dependencies": {
     "@mogd/db": "workspace:*",
+    "@mogd/domain": "workspace:*",
+    "@mogd/media": "workspace:*",
     "@mogd/shared": "workspace:*",
     "@mogd/ui": "workspace:*",
     "drizzle-orm": "^0.38.3",

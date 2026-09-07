@@ -26,6 +26,12 @@ importers:
       '@mogd/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@mogd/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
+      '@mogd/media':
+        specifier: workspace:*
+        version: link:../../packages/media
       '@mogd/shared':
         specifier: workspace:*
         version: link:../../packages/shared

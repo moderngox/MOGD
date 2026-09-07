@@ -15,6 +15,13 @@
       "when": 1788799749707,
       "tag": "0001_gray_shooting_star",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1788809215844,
+      "tag": "0002_short_franklin_storm",
+      "breakpoints": true
     }
   ]
 }

@@ -38,17 +38,9 @@ export type ActivityLevel = (typeof ACTIVITY_LEVEL_OPTIONS)[number];
 export const TRAINING_CONTEXT_OPTIONS = ["gym", "home", "bodyweight"] as const;
 export type TrainingContext = (typeof TRAINING_CONTEXT_OPTIONS)[number];
 
-export const EQUIPMENT_OPTIONS = [
-  "barbell",
-  "dumbbells",
-  "machines",
-  "cables",
-  "resistance_bands",
-  "kettlebells",
-  "pull_up_bar",
-  "bodyweight_only",
-] as const;
-export type Equipment = (typeof EQUIPMENT_OPTIONS)[number];
+// Shared with the exercise catalog's equipment requirements — see
+// exercises/options.ts for why this lives there, not here.
+export { EQUIPMENT_OPTIONS, type Equipment } from "../exercises/options";
 
 export const DIETARY_PREFERENCE_OPTIONS = [
   "standard",

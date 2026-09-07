@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  transpilePackages: ["@mogd/db", "@mogd/shared", "@mogd/ui"],
+  transpilePackages: ["@mogd/db", "@mogd/domain", "@mogd/media", "@mogd/shared", "@mogd/ui"],
   // See apps/web/next.config.ts for the full explanation of why both the
   // serverExternalPackages entry and the webpack() override below are
   // needed for libsql's native-binding loader to build cleanly.
