@@ -13,9 +13,7 @@ export default async function AdminAiRunsPage() {
       <h1 className="text-2xl font-semibold">AI Runs</h1>
       <p className="text-zinc-400">
         Every structured-generation call is logged here, including rejected
-        and errored runs (docs/AI_AND_SAFETY.md "AI run logging"). No
-        feature-specific generation exists yet in M0, so this list is
-        expected to be empty until M6.
+        and errored runs (docs/AI_AND_SAFETY.md "AI run logging").
       </p>
       {runs.length === 0 ? (
         <p className="text-sm text-zinc-500">No AI runs recorded yet.</p>

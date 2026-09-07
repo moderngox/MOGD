@@ -1,5 +1,6 @@
 import { eq, desc } from "drizzle-orm";
 import { schema, type Database } from "@mogd/db";
+import { interpretCheckin, type CheckInInterpretation } from "@mogd/ai";
 import { computeActualWeeklyRateKg, computeExpectedWeeklyRateKg } from "./trends";
 import { decideAdaptation, type AdaptationDecision } from "./rules";
 import { deriveFatMinimum, deriveCarbohydrateTarget } from "../nutrition/formulas";
@@ -13,6 +14,11 @@ const TREND_WINDOW_SIZE = 4;
 export interface RunAdaptationResult {
   decision: AdaptationDecision;
   outcome: "not_attempted" | "applied" | "rejected";
+  /** Display-only enrichment (docs/ARCHITECTURE.md §18's "Optional AI
+   * Interpretation" step). Never persisted, never consulted by any
+   * decision above — null whenever AI is unconfigured, unavailable, or
+   * returns something that fails validation (CLAUDE.md rule 4). */
+  aiInterpretation: CheckInInterpretation | null;
 }
 
 /**
@@ -55,6 +61,31 @@ export async function runAdaptation(
     nutritionAdherencePercent: latestCheckin?.nutritionAdherencePercent ?? 0,
   });
 
+  const [subjective] = await db
+    .select({
+      hunger: schema.checkins.hunger,
+      energy: schema.checkins.energy,
+      recovery: schema.checkins.recovery,
+      performanceNote: schema.checkins.performanceNote,
+      note: schema.checkins.note,
+      nutritionAdherencePercent: schema.checkins.nutritionAdherencePercent,
+    })
+    .from(schema.checkins)
+    .where(eq(schema.checkins.id, checkinId));
+
+  const aiInterpretation = subjective
+    ? await interpretCheckin(db, userId, {
+        decisionType: decision.type,
+        deterministicReason: decision.reason,
+        nutritionAdherencePercent: subjective.nutritionAdherencePercent,
+        hunger: subjective.hunger,
+        energy: subjective.energy,
+        recovery: subjective.recovery,
+        performanceNote: subjective.performanceNote ?? undefined,
+        note: subjective.note ?? undefined,
+      })
+    : null;
+
   if (decision.type !== "adjust_calories" || !nutritionTarget) {
     await db.insert(schema.planAdjustments).values({
       userId,
@@ -63,7 +94,7 @@ export async function runAdaptation(
       outcome: "not_attempted",
       reason: decision.reason,
     });
-    return { decision, outcome: "not_attempted" };
+    return { decision, outcome: "not_attempted", aiInterpretation };
   }
 
   const [body] = await db
@@ -95,7 +126,7 @@ export async function runAdaptation(
       newEnergyKcal,
       reason: `${decision.reason} Rejected: ${validation.reasons.join(" ")}`,
     });
-    return { decision, outcome: "rejected" };
+    return { decision, outcome: "rejected", aiInterpretation };
   }
 
   await db.transaction(async (tx) => {
@@ -115,5 +146,5 @@ export async function runAdaptation(
     });
   });
 
-  return { decision, outcome: "applied" };
+  return { decision, outcome: "applied", aiInterpretation };
 }

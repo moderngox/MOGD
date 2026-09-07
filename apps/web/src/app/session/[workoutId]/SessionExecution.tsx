@@ -14,6 +14,7 @@ export interface SessionExerciseView {
   repMax: number;
   rir: number;
   restSeconds: number;
+  selectionReason: string;
   videoUrl: string | null;
   previousPerformance: { loadKg: number | null; reps: number } | null;
   progressionTarget: {
@@ -82,6 +83,7 @@ function ExerciseCard({
           {exercise.restSeconds}s rest
         </span>
       </div>
+      <p className="text-xs text-zinc-500">{exercise.selectionReason}</p>
 
       {exercise.videoUrl && (
         <video src={exercise.videoUrl} controls className="w-full rounded-md" />

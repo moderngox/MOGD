@@ -13,3 +13,4 @@ export {
   type AllocatedExercise,
 } from "./sessionAllocation";
 export { computeProgressionTarget, type ProgressionInput, type ProgressionTarget } from "./progression";
+export { explainExerciseSelection } from "./explainSelection";

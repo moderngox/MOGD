@@ -21,3 +21,4 @@ export {
   type WeeklySessionView,
   type WeeklySessionStatus,
 } from "./getWeeklySessionStatus";
+export { listPrograms, type AdminProgramListItem } from "./adminQueries";

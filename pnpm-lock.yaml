@@ -198,6 +198,9 @@ importers:
 
   packages/domain:
     dependencies:
+      '@mogd/ai':
+        specifier: workspace:*
+        version: link:../ai
       '@mogd/db':
         specifier: workspace:*
         version: link:../db

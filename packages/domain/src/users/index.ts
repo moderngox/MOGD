@@ -1,5 +1,6 @@
 /**
- * users — identity and profile domain boundary. Business logic lands in M1
- * (registration, profile) per docs/IMPLEMENTATION_PLAN.md.
+ * users — identity and profile domain boundary. Registration lives in
+ * @mogd/shared/auth; account deletion lands here in M6.
  */
-export {};
+export { getPrivatePhotoObjectKeys, deleteUser } from "./deleteAccount";
+export { listUsers, type AdminUserListItem } from "./adminQueries";

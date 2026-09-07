@@ -1,6 +1,8 @@
 import { eq, asc } from "drizzle-orm";
 import { schema, type Database } from "@mogd/db";
 import { getPublishedAsset } from "../exercises/assetService";
+import { explainExerciseSelection } from "../training/explainSelection";
+import type { SessionLabel } from "../training/splitTemplates";
 
 export interface ProgramWorkoutExerciseView {
   workoutExerciseId: string;
@@ -15,6 +17,7 @@ export interface ProgramWorkoutExerciseView {
   rir: number;
   restSeconds: number;
   videoObjectKey: string | null;
+  selectionReason: string;
 }
 
 export interface ProgramWorkoutView {
@@ -60,6 +63,8 @@ export async function getCurrentProgram(db: Database, userId: string): Promise<P
         canonicalId: schema.exercises.canonicalId,
         name: schema.exercises.name,
         instructions: schema.exercises.instructions,
+        primaryMuscles: schema.exercises.primaryMuscles,
+        secondaryMuscles: schema.exercises.secondaryMuscles,
       })
       .from(schema.workoutExercises)
       .innerJoin(schema.exercises, eq(schema.workoutExercises.exerciseId, schema.exercises.id))
@@ -67,9 +72,17 @@ export async function getCurrentProgram(db: Database, userId: string): Promise<P
       .orderBy(asc(schema.workoutExercises.orderIndex));
 
     const exercises: ProgramWorkoutExerciseView[] = [];
-    for (const row of exerciseRows) {
+    for (const { primaryMuscles, secondaryMuscles, ...row } of exerciseRows) {
       const video = await getPublishedAsset(db, row.exerciseId, "video");
-      exercises.push({ ...row, videoObjectKey: video?.objectKey ?? null });
+      exercises.push({
+        ...row,
+        videoObjectKey: video?.objectKey ?? null,
+        selectionReason: explainExerciseSelection(
+          workout.sessionLabel as SessionLabel,
+          primaryMuscles,
+          secondaryMuscles,
+        ),
+      });
     }
 
     workouts.push({
@@ -119,6 +132,8 @@ export async function getWorkout(db: Database, workoutId: string): Promise<Progr
       canonicalId: schema.exercises.canonicalId,
       name: schema.exercises.name,
       instructions: schema.exercises.instructions,
+      primaryMuscles: schema.exercises.primaryMuscles,
+      secondaryMuscles: schema.exercises.secondaryMuscles,
     })
     .from(schema.workoutExercises)
     .innerJoin(schema.exercises, eq(schema.workoutExercises.exerciseId, schema.exercises.id))
@@ -126,9 +141,17 @@ export async function getWorkout(db: Database, workoutId: string): Promise<Progr
     .orderBy(asc(schema.workoutExercises.orderIndex));
 
   const exercises: ProgramWorkoutExerciseView[] = [];
-  for (const row of exerciseRows) {
+  for (const { primaryMuscles, secondaryMuscles, ...row } of exerciseRows) {
     const video = await getPublishedAsset(db, row.exerciseId, "video");
-    exercises.push({ ...row, videoObjectKey: video?.objectKey ?? null });
+    exercises.push({
+      ...row,
+      videoObjectKey: video?.objectKey ?? null,
+      selectionReason: explainExerciseSelection(
+        workout.sessionLabel as SessionLabel,
+        primaryMuscles,
+        secondaryMuscles,
+      ),
+    });
   }
 
   return {

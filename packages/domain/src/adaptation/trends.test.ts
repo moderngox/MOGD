@@ -29,6 +29,15 @@ describe("computeActualWeeklyRateKg", () => {
     ];
     expect(computeActualWeeklyRateKg(readings)).toBeCloseTo(-1);
   });
+
+  it("returns null when the readings are only minutes apart, rather than extrapolating an extreme rate", () => {
+    const now = Date.now();
+    const rate = computeActualWeeklyRateKg([
+      { averageWeightKg: 86.4, completedAt: new Date(now - 60_000) },
+      { averageWeightKg: 89, completedAt: new Date(now) },
+    ]);
+    expect(rate).toBeNull();
+  });
 });
 
 describe("computeExpectedWeeklyRateKg", () => {

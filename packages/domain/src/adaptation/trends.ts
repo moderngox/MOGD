@@ -6,6 +6,14 @@
 
 const MS_PER_WEEK = 7 * 24 * 60 * 60 * 1000;
 
+/** Below this window, dividing by elapsed time blows a small measurement
+ * gap up into an extreme, meaningless weekly rate (e.g. two check-ins a
+ * few minutes apart implying hundreds of kg/week) — found live when a
+ * resubmitted check-in landed seconds after the first. Two days is short
+ * of a real weekly cadence but long enough that ordinary reading noise
+ * can't dominate the extrapolation. */
+const MIN_MEANINGFUL_WINDOW_WEEKS = 2 / 7;
+
 export interface WeightReading {
   averageWeightKg: number;
   completedAt: Date;
@@ -17,7 +25,7 @@ export interface WeightReading {
  * periodization complexity until justified") rather than smoothing/
  * outlier-rejecting, which would need real tuning to get right. Returns
  * null when there's fewer than 2 readings (no trend to compute) or the
- * readings span zero time.
+ * readings don't span a meaningful window.
  */
 export function computeActualWeeklyRateKg(readings: WeightReading[]): number | null {
   if (readings.length < 2) return null;
@@ -27,7 +35,7 @@ export function computeActualWeeklyRateKg(readings: WeightReading[]): number | n
   const last = sorted[sorted.length - 1]!;
 
   const weeksElapsed = (last.completedAt.getTime() - first.completedAt.getTime()) / MS_PER_WEEK;
-  if (weeksElapsed <= 0) return null;
+  if (weeksElapsed < MIN_MEANINGFUL_WINDOW_WEEKS) return null;
 
   return (last.averageWeightKg - first.averageWeightKg) / weeksElapsed;
 }

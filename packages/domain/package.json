@@ -14,6 +14,7 @@
     "lint": "eslint src"
   },
   "dependencies": {
+    "@mogd/ai": "workspace:*",
     "@mogd/db": "workspace:*",
     "drizzle-orm": "^0.38.3",
     "zod": "^3.24.1"
