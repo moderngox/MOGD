@@ -3,7 +3,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   // Allows importing @mogd/* workspace packages as TS source without a
   // separate build step for each package.
-  transpilePackages: ["@mogd/db", "@mogd/domain", "@mogd/shared", "@mogd/ui"],
+  transpilePackages: ["@mogd/db", "@mogd/domain", "@mogd/media", "@mogd/shared", "@mogd/ui"],
   // @libsql/client's Node build pulls in native bindings via a dynamic
   // require plus README/LICENSE files webpack can't parse as modules.
   // Keep it (and its transitive libsql package) external instead of bundled.

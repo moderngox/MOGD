@@ -81,6 +81,9 @@ importers:
       '@mogd/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@mogd/media':
+        specifier: workspace:*
+        version: link:../../packages/media
       '@mogd/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -189,10 +192,19 @@ importers:
 
   packages/domain:
     dependencies:
+      '@mogd/db':
+        specifier: workspace:*
+        version: link:../db
+      drizzle-orm:
+        specifier: ^0.38.3
+        version: 0.38.4(@libsql/client@0.14.0)(@types/react@19.2.18)(react@19.2.8)
       zod:
         specifier: ^3.24.1
         version: 3.25.76
     devDependencies:
+      '@libsql/client':
+        specifier: ^0.14.0
+        version: 0.14.0
       eslint:
         specifier: ^9.18.0
         version: 9.39.5(jiti@2.7.0)

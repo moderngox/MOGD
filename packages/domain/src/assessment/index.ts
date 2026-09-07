@@ -1,5 +1,8 @@
 /**
- * assessment — onboarding questionnaire domain boundary. Implemented in M1
- * per docs/IMPLEMENTATION_PLAN.md and docs/PRODUCT.md §6.
+ * assessment — onboarding questionnaire domain boundary
+ * (docs/IMPLEMENTATION_PLAN.md M1, docs/PRODUCT.md §6).
  */
-export {};
+export * from "./options";
+export * from "./schemas";
+export { submitAssessment, type SubmitAssessmentResult } from "./submitAssessment";
+export { getUserAssessment, type UserAssessmentSummary } from "./getAssessment";
