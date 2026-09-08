@@ -6,3 +6,4 @@ export {
   EmailAlreadyRegisteredError,
   type RegisterUserInput,
 } from "./registerUser";
+export { isLockedOut, recordFailedAttempt } from "./rateLimit";

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getDb } from "@mogd/db";
-import { registerUser, EmailAlreadyRegisteredError } from "@mogd/shared/auth";
+import { registerUser, EmailAlreadyRegisteredError, isLockedOut, recordFailedAttempt } from "@mogd/shared/auth";
 import { signIn } from "@/auth";
 import { Button, Input } from "@mogd/ui";
 
@@ -13,12 +13,20 @@ export default async function SignUpPage({
 
   async function signUpAction(formData: FormData) {
     "use server";
+    const email = String(formData.get("email") ?? "");
+    const rateLimitKey = `web:signup:${email}`;
+
+    if (isLockedOut(rateLimitKey)) {
+      redirect("/sign-up?error=rate_limited");
+    }
+
     try {
       await registerUser(getDb(), {
-        email: String(formData.get("email") ?? ""),
+        email,
         password: String(formData.get("password") ?? ""),
       });
     } catch (error) {
+      recordFailedAttempt(rateLimitKey);
       if (error instanceof EmailAlreadyRegisteredError) {
         redirect("/sign-up?error=email_taken");
       }
@@ -26,7 +34,7 @@ export default async function SignUpPage({
     }
 
     await signIn("credentials", {
-      email: formData.get("email"),
+      email,
       password: formData.get("password"),
       redirectTo: "/dashboard",
     });
@@ -37,6 +45,8 @@ export default async function SignUpPage({
       <h1 className="text-2xl font-semibold">Create account</h1>
       {errorParam === "email_taken" ? (
         <p className="text-sm text-red-400">An account with this email already exists.</p>
+      ) : errorParam === "rate_limited" ? (
+        <p className="text-sm text-red-400">Too many attempts. Try again in a few minutes.</p>
       ) : errorParam ? (
         <p className="text-sm text-red-400">
           Could not create account. Password must be at least 8 characters.

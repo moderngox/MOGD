@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { AuthError } from "next-auth";
 import { signIn } from "@/auth";
+import { isLockedOut, recordFailedAttempt } from "@mogd/shared/auth";
 import { Button, Input } from "@mogd/ui";
 
 export default async function SignInPage({
@@ -12,14 +13,22 @@ export default async function SignInPage({
 
   async function signInAction(formData: FormData) {
     "use server";
+    const email = String(formData.get("email") ?? "");
+    const rateLimitKey = `web:signin:${email}`;
+
+    if (isLockedOut(rateLimitKey)) {
+      redirect("/sign-in?error=rate_limited");
+    }
+
     try {
       await signIn("credentials", {
-        email: formData.get("email"),
+        email,
         password: formData.get("password"),
         redirectTo: "/dashboard",
       });
     } catch (error) {
       if (error instanceof AuthError) {
+        recordFailedAttempt(rateLimitKey);
         redirect(`/sign-in?error=${error.type}`);
       }
       throw error;
@@ -29,7 +38,9 @@ export default async function SignInPage({
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-4 p-8">
       <h1 className="text-2xl font-semibold">Sign in</h1>
-      {errorParam ? (
+      {errorParam === "rate_limited" ? (
+        <p className="text-sm text-red-400">Too many attempts. Try again in a few minutes.</p>
+      ) : errorParam ? (
         <p className="text-sm text-red-400">Invalid email or password.</p>
       ) : null}
       <form action={signInAction} className="flex flex-col gap-3">
