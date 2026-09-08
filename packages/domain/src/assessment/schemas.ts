@@ -94,3 +94,19 @@ export const assessmentSubmissionSchema = goalStepSchema
   );
 
 export type AssessmentSubmission = z.infer<typeof assessmentSubmissionSchema>;
+
+/**
+ * Shape of the wizard's in-progress form state (docs/PRODUCT.md §6): the
+ * same fields as a submission minus photos, all optional since a draft can
+ * be saved from any step before every field is filled in.
+ */
+export const assessmentDraftFormStateSchema = goalStepSchema
+  .merge(physiquePrioritiesStepSchema)
+  .merge(bodyStepSchema)
+  .merge(trainingHistoryStepSchema)
+  .merge(availabilityStepSchema)
+  .merge(nutritionStepSchema)
+  .merge(optionalNoteStepSchema)
+  .partial();
+
+export type AssessmentDraftFormState = z.infer<typeof assessmentDraftFormStateSchema>;

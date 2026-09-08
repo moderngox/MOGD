@@ -25,7 +25,9 @@ Exit: independent build and checks pass; no SPIDRA runtime dependency; migration
 
 Implement registration, compact structured assessment, goals, up to three physique priorities, physical/training/nutrition profiles, availability/equipment and bounded optional notes. Support optional front/side photos with consent and private storage.
 
-Exit: validated assessment persists, unauthorized access is rejected, users can complete onboarding without photos, and eligibility rules prevent unsupported plan generation.
+The wizard autosaves a per-user draft (`assessment_draft`: step index + non-photo form state) on each step transition, so a user who leaves mid-assessment resumes silently at their last step on return instead of restarting. Photos aren't part of the draft — `File` objects can't survive a session — so a resumed session at the photos step re-prompts for upload. The draft is deleted once an eligible submission is durably persisted; it's kept on an ineligible rejection so the user can correct and resubmit. This mirrors SPIDRA's draft/resume pattern functionally (docs/SPIDRA_MIGRATION.md) but is freshly implemented per CLAUDE.md's SPIDRA-reuse rule — a single draft row per user rather than SPIDRA's per-answer table and resumable per-step routes, since MOGᴰ's wizard is one component rather than routed steps.
+
+Exit: validated assessment persists, unauthorized access is rejected, users can complete onboarding without photos, eligibility rules prevent unsupported plan generation, and a user who leaves mid-assessment can resume from their last completed step.
 
 ## M2 — Exercise catalog and reviewed media
 

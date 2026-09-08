@@ -105,6 +105,29 @@ export const nutritionProfiles = sqliteTable("nutrition_profile", {
 });
 
 /**
+ * One row per user — the in-progress wizard state (docs/PRODUCT.md §6),
+ * saved on each step transition so a user who leaves mid-assessment resumes
+ * where they stopped instead of restarting. Deleted once submitAssessment
+ * succeeds (`assessments` becomes the durable record from then on); never
+ * holds photos, since File objects can't survive a session (see
+ * AssessmentWizard's photos-step handling).
+ */
+export const assessmentDrafts = sqliteTable("assessment_draft", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  userId: text("userId")
+    .notNull()
+    .unique()
+    .references(() => users.id, { onDelete: "cascade" }),
+  step: integer("step").notNull(),
+  formState: text("formState", { mode: "json" }).$type<Record<string, unknown>>().notNull(),
+  updatedAt: integer("updatedAt", { mode: "timestamp_ms" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+/**
  * Private only — object keys point into the private-photos R2 bucket
  * (@mogd/media), never the public exercise-media bucket
  * (docs/ARCHITECTURE.md §9). One row per user per angle, replaced on

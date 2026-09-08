@@ -6,3 +6,4 @@ export * from "./options";
 export * from "./schemas";
 export { submitAssessment, type SubmitAssessmentResult } from "./submitAssessment";
 export { getUserAssessment, type UserAssessmentSummary } from "./getAssessment";
+export { saveDraft, getDraft, type AssessmentDraft, type SaveDraftInput } from "./draft";

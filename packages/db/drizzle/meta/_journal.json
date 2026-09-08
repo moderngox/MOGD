@@ -43,6 +43,13 @@
       "when": 1788818682336,
       "tag": "0005_deep_goblin_queen",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1788905223539,
+      "tag": "0006_motionless_red_ghost",
+      "breakpoints": true
     }
   ]
 }

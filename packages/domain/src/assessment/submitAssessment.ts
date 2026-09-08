@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm";
 import { schema, type Database } from "@mogd/db";
 import { checkEligibility } from "../safety/eligibility";
 import { assertOwnsPrivatePhotoKey } from "../users/photoOwnership";
@@ -172,6 +173,11 @@ export async function submitAssessment(
           },
         });
     }
+
+    // The draft's job is done once an eligible submission is durably
+    // persisted — delete it in the same transaction so a failed commit
+    // can't leave the user's answers stranded with nothing to resume.
+    await tx.delete(schema.assessmentDrafts).where(eq(schema.assessmentDrafts.userId, userId));
   });
 
   return eligibility;

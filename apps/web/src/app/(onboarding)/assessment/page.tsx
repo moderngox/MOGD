@@ -16,11 +16,12 @@ export default async function AssessmentPage() {
     redirect("/dashboard");
   }
 
+  const draft = await assessment.getDraft(getDb(), session.user.id);
   const photosAvailable = loadMediaEnv() !== null;
 
   return (
     <main className="mx-auto flex min-h-screen max-w-xl flex-col justify-center gap-6 p-8 py-16">
-      <AssessmentWizard photosAvailable={photosAvailable} />
+      <AssessmentWizard photosAvailable={photosAvailable} initialDraft={draft} />
     </main>
   );
 }

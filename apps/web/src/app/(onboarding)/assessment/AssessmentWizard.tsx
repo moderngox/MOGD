@@ -7,6 +7,7 @@ import { assessment, physique } from "@mogd/domain";
 import { AssessmentIntro } from "./AssessmentIntro";
 import {
   getPhotoUploadUrlAction,
+  saveDraftAction,
   submitAssessmentAction,
   generateStrategyAction,
   generateProgramAction,
@@ -126,11 +127,19 @@ const FIELD_LABELS: Record<string, string> = {
   optionalNote: "Note",
 };
 
-export function AssessmentWizard({ photosAvailable }: { photosAvailable: boolean }) {
+const LAST_STEP = STEP_TITLES.length - 1;
+
+export function AssessmentWizard({
+  photosAvailable,
+  initialDraft,
+}: {
+  photosAvailable: boolean;
+  initialDraft: assessment.AssessmentDraft | null;
+}) {
   const router = useRouter();
-  const [started, setStarted] = useState(false);
-  const [step, setStep] = useState(0);
-  const [form, setForm] = useState<FormState>(INITIAL_FORM);
+  const [started, setStarted] = useState(initialDraft !== null);
+  const [step, setStep] = useState(() => Math.min(initialDraft?.step ?? 0, LAST_STEP));
+  const [form, setForm] = useState<FormState>(() => ({ ...INITIAL_FORM, ...initialDraft?.formState }));
   const [photoFiles, setPhotoFiles] = useState<{ front?: File; side?: File }>({});
   const [consent, setConsent] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -178,14 +187,25 @@ export function AssessmentWizard({ photosAvailable }: { photosAvailable: boolean
     return true;
   }
 
+  // Fire-and-forget: a slow or failed autosave must not block navigation
+  // (see saveDraftAction's doc comment). The user only loses resumability
+  // back to this exact point, not the current session's progress.
+  function persistDraft(nextStep: number) {
+    void saveDraftAction(nextStep, form).catch(() => undefined);
+  }
+
   function next() {
     if (!validateStep()) return;
-    setStep((s) => Math.min(s + 1, STEP_TITLES.length - 1));
+    const nextStep = Math.min(step + 1, LAST_STEP);
+    setStep(nextStep);
+    persistDraft(nextStep);
   }
 
   function back() {
     setError(null);
-    setStep((s) => Math.max(s - 1, 0));
+    const nextStep = Math.max(step - 1, 0);
+    setStep(nextStep);
+    persistDraft(nextStep);
   }
 
   function togglePriority(value: (typeof PHYSIQUE_PRIORITY_OPTIONS)[number]) {
@@ -281,7 +301,14 @@ export function AssessmentWizard({ photosAvailable }: { photosAvailable: boolean
   }
 
   if (!started) {
-    return <AssessmentIntro onStart={() => setStarted(true)} />;
+    return (
+      <AssessmentIntro
+        onStart={() => {
+          setStarted(true);
+          persistDraft(0);
+        }}
+      />
+    );
   }
 
   const priorityCount = form.physiquePriorities?.length ?? 0;

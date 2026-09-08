@@ -47,6 +47,26 @@ export async function getPhotoUploadUrlAction(
   return { available: true, uploadUrl, objectKey: privatePhotoObjectKey(key) };
 }
 
+/**
+ * Best-effort autosave, fired on each wizard step transition (see
+ * AssessmentWizard's `persistDraft`). Never throws: a slow or failed save
+ * must not block the user from moving to the next step, it only means
+ * they'd resume from an earlier point if they left right now.
+ */
+export async function saveDraftAction(
+  step: number,
+  formState: assessment.AssessmentDraftFormState,
+): Promise<void> {
+  const session = await auth();
+  if (!session?.user?.id) return;
+
+  try {
+    await assessment.saveDraft(getDb(), session.user.id, { step, formState });
+  } catch {
+    // best-effort — see doc comment above
+  }
+}
+
 export interface SubmitAssessmentActionResult {
   eligible: boolean;
   reasons: string[];
