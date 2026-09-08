@@ -14,6 +14,7 @@ export const EQUIPMENT_OPTIONS = [
   "resistance_bands",
   "kettlebells",
   "pull_up_bar",
+  "dip_bar",
   "bodyweight_only",
 ] as const;
 export type Equipment = (typeof EQUIPMENT_OPTIONS)[number];
