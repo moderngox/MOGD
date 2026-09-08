@@ -48,11 +48,11 @@ export default async function SignUpPage({
       </p>
       <h1 className="text-2xl font-semibold">Create account</h1>
       {errorParam === "email_taken" ? (
-        <p className="text-sm text-red-400">An account with this email already exists.</p>
+        <p className="text-sm text-status-warning">An account with this email already exists.</p>
       ) : errorParam === "rate_limited" ? (
-        <p className="text-sm text-red-400">Too many attempts. Try again in a few minutes.</p>
+        <p className="text-sm text-status-warning">Too many attempts. Try again in a few minutes.</p>
       ) : errorParam ? (
-        <p className="text-sm text-red-400">
+        <p className="text-sm text-status-warning">
           Could not create account. Password must be at least 8 characters.
         </p>
       ) : null}

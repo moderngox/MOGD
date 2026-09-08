@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Checkbox, Input, Select, Textarea } from "@mogd/ui";
+import { Button, Card, ChoiceCard, Checkbox, Input, NumberStepper, StepMeter, Textarea } from "@mogd/ui";
 import { assessment, physique } from "@mogd/domain";
+import { AssessmentIntro } from "./AssessmentIntro";
 import {
   getPhotoUploadUrlAction,
   submitAssessmentAction,
@@ -50,8 +51,35 @@ const STEP_TITLES = [
   "Anything else?",
 ];
 
+const STEP_DESCRIPTIONS = [
+  "What outcome matters most right now.",
+  "The areas you most want to develop.",
+  "Used to calibrate targets — accurate numbers give a better plan.",
+  "Optional. Never shown publicly.",
+  "Helps calibrate difficulty and pacing from the start.",
+  "Be realistic — the plan adapts to what you select here.",
+  "Sets your calorie and macro targets.",
+  "Optional — extra context for your plan. Structured answers above still take priority.",
+];
+
+const GOAL_DESCRIPTIONS: Record<string, string> = {
+  fat_loss: "Reduce body fat while preserving muscle.",
+  recomposition: "Lose fat and build muscle at the same time.",
+  muscle_gain: "Build muscle, accept some fat gain.",
+  strength: "Get stronger — prioritize load over appearance.",
+};
+
+const DEFAULT_AGE = 30;
+const DEFAULT_HEIGHT_CM = 175;
+const DEFAULT_WEIGHT_KG = 80;
+const DEFAULT_WAIST_CM = 85;
+const DEFAULT_SESSIONS_PER_WEEK = 3;
+const DEFAULT_SESSION_DURATION_MIN = 45;
+const DEFAULT_MEALS_PER_DAY = 3;
+
 export function AssessmentWizard({ photosAvailable }: { photosAvailable: boolean }) {
   const router = useRouter();
+  const [started, setStarted] = useState(false);
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<FormState>({ physiquePriorities: [], equipment: [] });
   const [photoFiles, setPhotoFiles] = useState<{ front?: File; side?: File }>({});
@@ -192,340 +220,388 @@ export function AssessmentWizard({ photosAvailable }: { photosAvailable: boolean
 
   if (rejectionReasons) {
     return (
-      <div className="flex flex-col gap-3">
-        <h1 className="text-2xl font-semibold">MOGᴰ can&apos;t support this yet</h1>
-        <ul className="list-inside list-disc text-zinc-400">
+      <Card className="gap-3">
+        <h1 className="font-display text-2xl font-semibold text-fg">MOGᴰ can&apos;t support this yet</h1>
+        <ul className="list-inside list-disc text-fg-secondary">
           {rejectionReasons.map((reason) => (
             <li key={reason}>{reason}</li>
           ))}
         </ul>
-      </div>
+      </Card>
     );
   }
 
+  if (!started) {
+    return <AssessmentIntro onStart={() => setStarted(true)} />;
+  }
+
+  const priorityCount = form.physiquePriorities?.length ?? 0;
+  const priorityAtMax = priorityCount >= MAX_PHYSIQUE_PRIORITIES;
+  const targetWeightEnabled = form.targetWeightKg !== undefined;
+
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <p className="text-sm text-zinc-500">
-          Step {step + 1} of {STEP_TITLES.length}
-        </p>
-        <h1 className="text-2xl font-semibold">{STEP_TITLES[step]}</h1>
+      <StepMeter step={step} total={STEP_TITLES.length} />
+
+      <div className="flex flex-col gap-1">
+        <h1 className="font-display text-2xl font-semibold text-fg">{STEP_TITLES[step]}</h1>
+        <p className="text-sm text-fg-secondary">{STEP_DESCRIPTIONS[step]}</p>
       </div>
 
-      {step === 0 && (
-        <div className="flex flex-col gap-2">
-          {PRIMARY_GOAL_OPTIONS.map((option) => (
-            <label key={option} className="flex items-center gap-2 text-sm text-zinc-200">
-              <input
-                type="radio"
-                name="primaryGoal"
-                checked={form.primaryGoal === option}
-                onChange={() => set("primaryGoal", option)}
+      <Card className="gap-4">
+        {step === 0 && (
+          <div role="radiogroup" aria-label="Primary goal" className="flex flex-col gap-2">
+            {PRIMARY_GOAL_OPTIONS.map((option) => (
+              <ChoiceCard
+                key={option}
+                role="radio"
+                variant="block"
+                label={label(option)}
+                description={GOAL_DESCRIPTIONS[option]}
+                selected={form.primaryGoal === option}
+                onSelect={() => set("primaryGoal", option)}
               />
-              {label(option)}
-            </label>
-          ))}
-        </div>
-      )}
-
-      {step === 1 && (
-        <div className="flex flex-col gap-2">
-          <p className="text-sm text-zinc-500">
-            Select up to {MAX_PHYSIQUE_PRIORITIES}.
-          </p>
-          {PHYSIQUE_PRIORITY_OPTIONS.map((option) => (
-            <Checkbox
-              key={option}
-              id={`priority-${option}`}
-              label={label(option)}
-              checked={(form.physiquePriorities ?? []).includes(option)}
-              onChange={() => togglePriority(option)}
-            />
-          ))}
-        </div>
-      )}
-
-      {step === 2 && (
-        <div className="flex flex-col gap-3">
-          <Select
-            value={form.sex ?? ""}
-            onChange={(e) => set("sex", e.target.value as (typeof SEX_OPTIONS)[number])}
-          >
-            <option value="" disabled>
-              Sex
-            </option>
-            {SEX_OPTIONS.map((o) => (
-              <option key={o} value={o}>
-                {label(o)}
-              </option>
             ))}
-          </Select>
-          <Input
-            type="number"
-            placeholder="Age"
-            value={form.age ?? ""}
-            onChange={(e) => set("age", Number(e.target.value))}
-          />
-          <Input
-            type="number"
-            placeholder="Height (cm)"
-            value={form.heightCm ?? ""}
-            onChange={(e) => set("heightCm", Number(e.target.value))}
-          />
-          <Input
-            type="number"
-            placeholder="Weight (kg)"
-            value={form.weightKg ?? ""}
-            onChange={(e) => set("weightKg", Number(e.target.value))}
-          />
-          <Input
-            type="number"
-            placeholder="Waist (cm)"
-            value={form.waistCm ?? ""}
-            onChange={(e) => set("waistCm", Number(e.target.value))}
-          />
-          <Input
-            type="number"
-            placeholder="Target weight (kg) — optional"
-            value={form.targetWeightKg ?? ""}
-            onChange={(e) =>
-              set("targetWeightKg", e.target.value ? Number(e.target.value) : undefined)
-            }
-          />
-        </div>
-      )}
+          </div>
+        )}
 
-      {step === 3 && (
-        <div className="flex flex-col gap-3">
-          {!photosAvailable ? (
-            <p className="text-sm text-zinc-500">
-              Photo upload isn&apos;t available right now — you can skip this step.
+        {step === 1 && (
+          <div className="flex flex-col gap-3">
+            <p className="text-sm text-fg-secondary">
+              Select up to {MAX_PHYSIQUE_PRIORITIES} — {priorityCount} of {MAX_PHYSIQUE_PRIORITIES} selected.
             </p>
-          ) : (
-            <>
-              <p className="text-sm text-zinc-500">
-                Optional. Front and/or side. Private — never shown publicly.
-              </p>
-              <Checkbox
-                id="photo-consent"
-                label="I consent to MOGᴰ storing these photos privately for my own assessment."
-                checked={consent}
-                onChange={(e) => setConsent(e.target.checked)}
-              />
-              <label className="text-sm text-zinc-400">
-                Front photo
-                <input
-                  type="file"
-                  accept="image/*"
-                  disabled={!consent}
-                  className="block text-sm text-zinc-400"
-                  onChange={(e) =>
-                    setPhotoFiles((prev) => ({ ...prev, front: e.target.files?.[0] }))
-                  }
-                />
-              </label>
-              <label className="text-sm text-zinc-400">
-                Side photo
-                <input
-                  type="file"
-                  accept="image/*"
-                  disabled={!consent}
-                  className="block text-sm text-zinc-400"
-                  onChange={(e) =>
-                    setPhotoFiles((prev) => ({ ...prev, side: e.target.files?.[0] }))
-                  }
-                />
-              </label>
-            </>
-          )}
-        </div>
-      )}
+            <div role="group" aria-label="Physique priorities" className="flex flex-wrap gap-2">
+              {PHYSIQUE_PRIORITY_OPTIONS.map((option) => {
+                const selected = (form.physiquePriorities ?? []).includes(option);
+                return (
+                  <ChoiceCard
+                    key={option}
+                    role="checkbox"
+                    variant="pill"
+                    label={label(option)}
+                    selected={selected}
+                    disabled={priorityAtMax && !selected}
+                    onSelect={() => togglePriority(option)}
+                  />
+                );
+              })}
+            </div>
+          </div>
+        )}
 
-      {step === 4 && (
-        <div className="flex flex-col gap-3">
-          <Select
-            value={form.experienceLevel ?? ""}
-            onChange={(e) =>
-              set("experienceLevel", e.target.value as (typeof EXPERIENCE_LEVEL_OPTIONS)[number])
-            }
-          >
-            <option value="" disabled>
-              Experience level
-            </option>
-            {EXPERIENCE_LEVEL_OPTIONS.map((o) => (
-              <option key={o} value={o}>
-                {label(o)}
-              </option>
-            ))}
-          </Select>
-          <Select
-            value={form.trainingConsistency ?? ""}
-            onChange={(e) =>
-              set(
-                "trainingConsistency",
-                e.target.value as (typeof TRAINING_CONSISTENCY_OPTIONS)[number],
-              )
-            }
-          >
-            <option value="" disabled>
-              Consistency
-            </option>
-            {TRAINING_CONSISTENCY_OPTIONS.map((o) => (
-              <option key={o} value={o}>
-                {label(o)}
-              </option>
-            ))}
-          </Select>
-          <Select
-            value={form.currentActivityLevel ?? ""}
-            onChange={(e) =>
-              set(
-                "currentActivityLevel",
-                e.target.value as (typeof ACTIVITY_LEVEL_OPTIONS)[number],
-              )
-            }
-          >
-            <option value="" disabled>
-              Current activity level
-            </option>
-            {ACTIVITY_LEVEL_OPTIONS.map((o) => (
-              <option key={o} value={o}>
-                {label(o)}
-              </option>
-            ))}
-          </Select>
-          <Textarea
-            placeholder="Training history (optional)"
-            value={form.trainingHistoryNotes ?? ""}
-            onChange={(e) => set("trainingHistoryNotes", e.target.value)}
-          />
-          <Textarea
-            placeholder="Limitations (optional)"
-            value={form.limitations ?? ""}
-            onChange={(e) => set("limitations", e.target.value)}
-          />
-          <Textarea
-            placeholder="Injury restrictions (optional)"
-            value={form.injuryRestrictions ?? ""}
-            onChange={(e) => set("injuryRestrictions", e.target.value)}
-          />
-        </div>
-      )}
-
-      {step === 5 && (
-        <div className="flex flex-col gap-3">
-          <Input
-            type="number"
-            placeholder="Sessions per week"
-            value={form.sessionsPerWeek ?? ""}
-            onChange={(e) => set("sessionsPerWeek", Number(e.target.value))}
-          />
-          <Input
-            type="number"
-            placeholder="Session duration (minutes)"
-            value={form.sessionDurationMinutes ?? ""}
-            onChange={(e) => set("sessionDurationMinutes", Number(e.target.value))}
-          />
-          <Select
-            value={form.trainingContext ?? ""}
-            onChange={(e) =>
-              set("trainingContext", e.target.value as (typeof TRAINING_CONTEXT_OPTIONS)[number])
-            }
-          >
-            <option value="" disabled>
-              Where do you train?
-            </option>
-            {TRAINING_CONTEXT_OPTIONS.map((o) => (
-              <option key={o} value={o}>
-                {label(o)}
-              </option>
-            ))}
-          </Select>
-          <p className="text-sm text-zinc-500">Equipment available</p>
-          {EQUIPMENT_OPTIONS.map((o) => (
-            <Checkbox
-              key={o}
-              id={`equipment-${o}`}
-              label={label(o)}
-              checked={(form.equipment ?? []).includes(o)}
-              onChange={() => toggleEquipment(o)}
+        {step === 2 && (
+          <div className="flex flex-col gap-5">
+            <div role="radiogroup" aria-label="Sex" className="flex flex-col gap-2">
+              <span className="text-sm font-medium text-fg-secondary-alt">Sex</span>
+              <div className="flex flex-wrap gap-2">
+                {SEX_OPTIONS.map((o) => (
+                  <ChoiceCard
+                    key={o}
+                    role="radio"
+                    variant="pill"
+                    label={label(o)}
+                    selected={form.sex === o}
+                    onSelect={() => set("sex", o)}
+                  />
+                ))}
+              </div>
+            </div>
+            <NumberStepper
+              id="age"
+              label="Age"
+              min={16}
+              max={80}
+              value={form.age ?? DEFAULT_AGE}
+              onChange={(v) => set("age", v)}
             />
-          ))}
-        </div>
-      )}
+            <NumberStepper
+              id="height"
+              label="Height"
+              unit="cm"
+              min={140}
+              max={210}
+              value={form.heightCm ?? DEFAULT_HEIGHT_CM}
+              onChange={(v) => set("heightCm", v)}
+            />
+            <NumberStepper
+              id="weight"
+              label="Weight"
+              unit="kg"
+              min={40}
+              max={180}
+              value={form.weightKg ?? DEFAULT_WEIGHT_KG}
+              onChange={(v) => set("weightKg", v)}
+            />
+            <NumberStepper
+              id="waist"
+              label="Waist"
+              unit="cm"
+              min={50}
+              max={150}
+              value={form.waistCm ?? DEFAULT_WAIST_CM}
+              onChange={(v) => set("waistCm", v)}
+            />
+            <div className="flex flex-col gap-3 border-t border-border pt-4">
+              <Checkbox
+                id="target-weight-toggle"
+                label="Set a target weight"
+                checked={targetWeightEnabled}
+                onChange={(e) =>
+                  set("targetWeightKg", e.target.checked ? (form.weightKg ?? DEFAULT_WEIGHT_KG) : undefined)
+                }
+              />
+              {targetWeightEnabled && (
+                <NumberStepper
+                  id="target-weight"
+                  label="Target weight"
+                  unit="kg"
+                  min={40}
+                  max={180}
+                  value={form.targetWeightKg ?? DEFAULT_WEIGHT_KG}
+                  onChange={(v) => set("targetWeightKg", v)}
+                />
+              )}
+            </div>
+          </div>
+        )}
 
-      {step === 6 && (
-        <div className="flex flex-col gap-3">
-          <Select
-            value={form.dietaryPreference ?? ""}
-            onChange={(e) =>
-              set(
-                "dietaryPreference",
-                e.target.value as (typeof DIETARY_PREFERENCE_OPTIONS)[number],
-              )
-            }
-          >
-            <option value="" disabled>
-              Dietary preference
-            </option>
-            {DIETARY_PREFERENCE_OPTIONS.map((o) => (
-              <option key={o} value={o}>
-                {label(o)}
-              </option>
-            ))}
-          </Select>
-          <Input
-            placeholder="Allergies / intolerances (optional)"
-            value={form.allergies ?? ""}
-            onChange={(e) => set("allergies", e.target.value)}
-          />
-          <Input
-            type="number"
-            placeholder="Meals per day"
-            value={form.mealsPerDay ?? ""}
-            onChange={(e) => set("mealsPerDay", Number(e.target.value))}
-          />
-          <Select
-            value={form.cookingPreference ?? ""}
-            onChange={(e) =>
-              set(
-                "cookingPreference",
-                e.target.value as (typeof COOKING_PREFERENCE_OPTIONS)[number],
-              )
-            }
-          >
-            <option value="" disabled>
-              Cooking preference
-            </option>
-            {COOKING_PREFERENCE_OPTIONS.map((o) => (
-              <option key={o} value={o}>
-                {label(o)}
-              </option>
-            ))}
-          </Select>
-          <Input
-            placeholder="Disliked foods (optional)"
-            value={form.dislikedFoods ?? ""}
-            onChange={(e) => set("dislikedFoods", e.target.value)}
-          />
-          <Checkbox
-            id="track-calories"
-            label="I'm willing to track calories/macros"
-            checked={form.willingToTrackCalories ?? false}
-            onChange={(e) => set("willingToTrackCalories", e.target.checked)}
-          />
-        </div>
-      )}
+        {step === 3 && (
+          <div className="flex flex-col gap-3">
+            {!photosAvailable ? (
+              <p className="text-sm text-fg-secondary">
+                Photo upload isn&apos;t available right now — you can skip this step.
+              </p>
+            ) : (
+              <>
+                <p className="text-sm text-fg-secondary">
+                  Optional. Front and/or side. Private — never shown publicly.
+                </p>
+                <Checkbox
+                  id="photo-consent"
+                  label="I consent to MOGᴰ storing these photos privately for my own assessment."
+                  checked={consent}
+                  onChange={(e) => setConsent(e.target.checked)}
+                />
+                <div className="grid grid-cols-2 gap-3">
+                  {(["front", "side"] as const).map((angle) => (
+                    <label
+                      key={angle}
+                      className={
+                        consent
+                          ? "flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border-strong bg-surface-alt p-6 text-center transition-colors hover:border-accent"
+                          : "flex cursor-not-allowed flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border bg-surface-alt p-6 text-center opacity-50"
+                      }
+                    >
+                      <span className="text-sm font-medium text-fg-secondary-alt">
+                        {photoFiles[angle] ? photoFiles[angle]!.name : `${label(angle)} photo`}
+                      </span>
+                      <span className="text-xs text-fg-muted">
+                        {photoFiles[angle] ? "Tap to replace" : "Tap to upload"}
+                      </span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        disabled={!consent}
+                        className="sr-only"
+                        onChange={(e) =>
+                          setPhotoFiles((prev) => ({ ...prev, [angle]: e.target.files?.[0] }))
+                        }
+                      />
+                    </label>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
 
-      {step === 7 && (
-        <Textarea
-          placeholder="Anything else your coach should know? (optional)"
-          value={form.optionalNote ?? ""}
-          onChange={(e) => set("optionalNote", e.target.value)}
-        />
-      )}
+        {step === 4 && (
+          <div className="flex flex-col gap-5">
+            <div className="flex flex-col gap-2">
+              <span className="text-sm font-medium text-fg-secondary-alt">Experience level</span>
+              <div role="radiogroup" aria-label="Experience level" className="flex flex-wrap gap-2">
+                {EXPERIENCE_LEVEL_OPTIONS.map((o) => (
+                  <ChoiceCard
+                    key={o}
+                    role="radio"
+                    variant="pill"
+                    label={label(o)}
+                    selected={form.experienceLevel === o}
+                    onSelect={() => set("experienceLevel", o)}
+                  />
+                ))}
+              </div>
+            </div>
+            <div className="flex flex-col gap-2">
+              <span className="text-sm font-medium text-fg-secondary-alt">Recent consistency</span>
+              <div role="radiogroup" aria-label="Training consistency" className="flex flex-wrap gap-2">
+                {TRAINING_CONSISTENCY_OPTIONS.map((o) => (
+                  <ChoiceCard
+                    key={o}
+                    role="radio"
+                    variant="pill"
+                    label={label(o)}
+                    selected={form.trainingConsistency === o}
+                    onSelect={() => set("trainingConsistency", o)}
+                  />
+                ))}
+              </div>
+            </div>
+            <div className="flex flex-col gap-2">
+              <span className="text-sm font-medium text-fg-secondary-alt">Current activity level</span>
+              <div role="radiogroup" aria-label="Current activity level" className="flex flex-wrap gap-2">
+                {ACTIVITY_LEVEL_OPTIONS.map((o) => (
+                  <ChoiceCard
+                    key={o}
+                    role="radio"
+                    variant="pill"
+                    label={label(o)}
+                    selected={form.currentActivityLevel === o}
+                    onSelect={() => set("currentActivityLevel", o)}
+                  />
+                ))}
+              </div>
+            </div>
+            <Textarea
+              placeholder="Training history (optional)"
+              value={form.trainingHistoryNotes ?? ""}
+              onChange={(e) => set("trainingHistoryNotes", e.target.value)}
+            />
+            <Textarea
+              placeholder="Limitations (optional)"
+              value={form.limitations ?? ""}
+              onChange={(e) => set("limitations", e.target.value)}
+            />
+            <Textarea
+              placeholder="Injury restrictions (optional)"
+              value={form.injuryRestrictions ?? ""}
+              onChange={(e) => set("injuryRestrictions", e.target.value)}
+            />
+          </div>
+        )}
 
-      {error && <p className="text-sm text-red-400">{error}</p>}
+        {step === 5 && (
+          <div className="flex flex-col gap-5">
+            <NumberStepper
+              id="sessions-per-week"
+              label="Sessions per week"
+              min={1}
+              max={7}
+              value={form.sessionsPerWeek ?? DEFAULT_SESSIONS_PER_WEEK}
+              onChange={(v) => set("sessionsPerWeek", v)}
+            />
+            <NumberStepper
+              id="session-duration"
+              label="Session duration"
+              unit="min"
+              min={10}
+              max={120}
+              step={5}
+              value={form.sessionDurationMinutes ?? DEFAULT_SESSION_DURATION_MIN}
+              onChange={(v) => set("sessionDurationMinutes", v)}
+            />
+            <div className="flex flex-col gap-2">
+              <span className="text-sm font-medium text-fg-secondary-alt">Where do you train?</span>
+              <div role="radiogroup" aria-label="Training context" className="flex flex-wrap gap-2">
+                {TRAINING_CONTEXT_OPTIONS.map((o) => (
+                  <ChoiceCard
+                    key={o}
+                    role="radio"
+                    variant="pill"
+                    label={label(o)}
+                    selected={form.trainingContext === o}
+                    onSelect={() => set("trainingContext", o)}
+                  />
+                ))}
+              </div>
+            </div>
+            <div className="flex flex-col gap-2">
+              <span className="text-sm font-medium text-fg-secondary-alt">Equipment available</span>
+              <div role="group" aria-label="Equipment available" className="flex flex-wrap gap-2">
+                {EQUIPMENT_OPTIONS.map((o) => (
+                  <ChoiceCard
+                    key={o}
+                    role="checkbox"
+                    variant="pill"
+                    label={label(o)}
+                    selected={(form.equipment ?? []).includes(o)}
+                    onSelect={() => toggleEquipment(o)}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {step === 6 && (
+          <div className="flex flex-col gap-5">
+            <div className="flex flex-col gap-2">
+              <span className="text-sm font-medium text-fg-secondary-alt">Dietary preference</span>
+              <div role="radiogroup" aria-label="Dietary preference" className="grid grid-cols-2 gap-2">
+                {DIETARY_PREFERENCE_OPTIONS.map((o) => (
+                  <ChoiceCard
+                    key={o}
+                    role="radio"
+                    variant="pill"
+                    label={label(o)}
+                    selected={form.dietaryPreference === o}
+                    onSelect={() => set("dietaryPreference", o)}
+                  />
+                ))}
+              </div>
+            </div>
+            <Input
+              placeholder="Allergies / intolerances (optional)"
+              value={form.allergies ?? ""}
+              onChange={(e) => set("allergies", e.target.value)}
+            />
+            <NumberStepper
+              id="meals-per-day"
+              label="Meals per day"
+              min={1}
+              max={8}
+              value={form.mealsPerDay ?? DEFAULT_MEALS_PER_DAY}
+              onChange={(v) => set("mealsPerDay", v)}
+            />
+            <div className="flex flex-col gap-2">
+              <span className="text-sm font-medium text-fg-secondary-alt">Cooking preference</span>
+              <div role="radiogroup" aria-label="Cooking preference" className="flex flex-wrap gap-2">
+                {COOKING_PREFERENCE_OPTIONS.map((o) => (
+                  <ChoiceCard
+                    key={o}
+                    role="radio"
+                    variant="pill"
+                    label={label(o)}
+                    selected={form.cookingPreference === o}
+                    onSelect={() => set("cookingPreference", o)}
+                  />
+                ))}
+              </div>
+            </div>
+            <Input
+              placeholder="Disliked foods (optional)"
+              value={form.dislikedFoods ?? ""}
+              onChange={(e) => set("dislikedFoods", e.target.value)}
+            />
+            <Checkbox
+              id="track-calories"
+              label="I'm willing to track calories/macros"
+              checked={form.willingToTrackCalories ?? false}
+              onChange={(e) => set("willingToTrackCalories", e.target.checked)}
+            />
+          </div>
+        )}
+
+        {step === 7 && (
+          <Textarea
+            placeholder="Anything else your coach should know? (optional)"
+            value={form.optionalNote ?? ""}
+            onChange={(e) => set("optionalNote", e.target.value)}
+          />
+        )}
+      </Card>
+
+      {error && <p className="text-sm text-status-warning">{error}</p>}
 
       <div className="flex justify-between">
         <Button variant="secondary" onClick={back} disabled={step === 0 || submitting}>

@@ -9,4 +9,7 @@ export { BigStat, type BigStatProps } from "./BigStat";
 export { ProgressBar, type ProgressBarProps, type ProgressBarVariant } from "./ProgressBar";
 export { Sparkline, type SparklineProps } from "./Sparkline";
 export { SidebarNav, type SidebarNavProps, type SidebarNavItem } from "./SidebarNav";
+export { StepMeter, type StepMeterProps } from "./StepMeter";
+export { ChoiceCard, type ChoiceCardProps, type ChoiceCardVariant } from "./ChoiceCard";
+export { NumberStepper, type NumberStepperProps } from "./NumberStepper";
 export { cn } from "./cn";

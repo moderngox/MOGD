@@ -19,7 +19,7 @@ export default async function AssessmentPage() {
   const photosAvailable = loadMediaEnv() !== null;
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-lg flex-col gap-6 p-8">
+    <main className="mx-auto flex min-h-screen max-w-xl flex-col justify-center gap-6 p-8 py-16">
       <AssessmentWizard photosAvailable={photosAvailable} />
     </main>
   );

@@ -43,9 +43,9 @@ export default async function SignInPage({
       </p>
       <h1 className="text-2xl font-semibold">Sign in</h1>
       {errorParam === "rate_limited" ? (
-        <p className="text-sm text-red-400">Too many attempts. Try again in a few minutes.</p>
+        <p className="text-sm text-status-warning">Too many attempts. Try again in a few minutes.</p>
       ) : errorParam ? (
-        <p className="text-sm text-red-400">Invalid email or password.</p>
+        <p className="text-sm text-status-warning">Invalid email or password.</p>
       ) : null}
       <form action={signInAction} className="flex flex-col gap-3">
         <Input type="email" name="email" placeholder="Email" required autoComplete="email" />
