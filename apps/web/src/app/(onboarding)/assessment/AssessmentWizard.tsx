@@ -145,6 +145,8 @@ export function AssessmentWizard({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [rejectionReasons, setRejectionReasons] = useState<string[] | null>(null);
+  const [skippedPhotoAngles, setSkippedPhotoAngles] = useState<("front" | "side")[]>([]);
+  const [submitted, setSubmitted] = useState(false);
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -228,23 +230,31 @@ export function AssessmentWizard({
     );
   }
 
+  // Never throws: a direct-to-R2 PUT can fail for reasons outside the
+  // user's control (network blip, R2/CORS misconfiguration) and photos are
+  // optional (docs/PRODUCT.md: "Do not require photos") — a failed upload
+  // should skip that photo, not abort the whole assessment submission.
   async function uploadPhoto(angle: "front" | "side", file: File) {
-    const extensionMatch = file.type.split("/")[1];
-    const extension = (
-      ["jpg", "jpeg", "png", "webp"].includes(extensionMatch ?? "") ? extensionMatch : "jpg"
-    ) as "jpg" | "jpeg" | "png" | "webp";
+    try {
+      const extensionMatch = file.type.split("/")[1];
+      const extension = (
+        ["jpg", "jpeg", "png", "webp"].includes(extensionMatch ?? "") ? extensionMatch : "jpg"
+      ) as "jpg" | "jpeg" | "png" | "webp";
 
-    const result = await getPhotoUploadUrlAction(angle, extension);
-    if (!result.available || !result.uploadUrl || !result.objectKey) return null;
+      const result = await getPhotoUploadUrlAction(angle, extension);
+      if (!result.available || !result.uploadUrl || !result.objectKey) return null;
 
-    const res = await fetch(result.uploadUrl, {
-      method: "PUT",
-      body: file,
-      headers: { "Content-Type": file.type },
-    });
-    if (!res.ok) return null;
+      const res = await fetch(result.uploadUrl, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": file.type },
+      });
+      if (!res.ok) return null;
 
-    return { angle, objectKey: result.objectKey };
+      return { angle, objectKey: result.objectKey };
+    } catch {
+      return null;
+    }
   }
 
   async function submit() {
@@ -254,12 +264,17 @@ export function AssessmentWizard({
 
     try {
       const photos: { angle: "front" | "side"; objectKey: string }[] = [];
+      const skipped: ("front" | "side")[] = [];
       if (consent) {
         for (const angle of ["front", "side"] as const) {
           const file = photoFiles[angle];
           if (!file) continue;
           const uploaded = await uploadPhoto(angle, file);
-          if (uploaded) photos.push(uploaded);
+          if (uploaded) {
+            photos.push(uploaded);
+          } else {
+            skipped.push(angle);
+          }
         }
       }
 
@@ -279,6 +294,17 @@ export function AssessmentWizard({
       await generateStrategyAction().catch(() => undefined);
       await generateProgramAction().catch(() => undefined);
 
+      // Photos are optional (docs/PRODUCT.md: "Do not require photos") and
+      // can be added later from the profile, so a failed upload never blocks
+      // onboarding — but a silent, unannounced skip right before navigating
+      // away would leave the user assuming a photo they picked was saved
+      // when it wasn't, so pause on a notice instead of auto-redirecting.
+      if (skipped.length > 0) {
+        setSkippedPhotoAngles(skipped);
+        setSubmitted(true);
+        return;
+      }
+
       router.push("/dashboard");
     } catch {
       setError("Something went wrong submitting your assessment. Please try again.");
@@ -296,6 +322,19 @@ export function AssessmentWizard({
             <li key={reason}>{reason}</li>
           ))}
         </ul>
+      </Card>
+    );
+  }
+
+  if (submitted) {
+    return (
+      <Card className="gap-4">
+        <h1 className="font-display text-2xl font-semibold text-fg">Assessment saved</h1>
+        <p className="text-sm text-status-warning">
+          Your {skippedPhotoAngles.map(label).join(" and ")} photo couldn&apos;t be uploaded, so it was
+          skipped — your other answers were saved. You can add it later from your profile.
+        </p>
+        <Button onClick={() => router.push("/dashboard")}>Continue to dashboard</Button>
       </Card>
     );
   }
