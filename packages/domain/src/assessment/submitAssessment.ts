@@ -1,5 +1,6 @@
 import { schema, type Database } from "@mogd/db";
 import { checkEligibility } from "../safety/eligibility";
+import { assertOwnsPrivatePhotoKey } from "../users/photoOwnership";
 import { assessmentSubmissionSchema, type AssessmentSubmission } from "./schemas";
 
 export interface SubmitAssessmentResult {
@@ -22,6 +23,10 @@ export async function submitAssessment(
   rawInput: AssessmentSubmission,
 ): Promise<SubmitAssessmentResult> {
   const input = assessmentSubmissionSchema.parse(rawInput);
+
+  for (const photo of input.photos) {
+    assertOwnsPrivatePhotoKey(userId, photo.objectKey);
+  }
 
   const eligibility = checkEligibility({ sex: input.sex, age: input.age });
   if (!eligibility.eligible) {

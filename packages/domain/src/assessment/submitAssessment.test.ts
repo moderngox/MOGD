@@ -87,15 +87,29 @@ describe("submitAssessment", () => {
   it("persists photo rows and upserts by angle on re-upload", async () => {
     await submitAssessment(db, userId, {
       ...validSubmission,
-      photos: [{ angle: "front", objectKey: "users/u1/photos/v1.jpg" }],
+      photos: [{ angle: "front", objectKey: `users/${userId}/photos/v1.jpg` }],
     });
     await submitAssessment(db, userId, {
       ...validSubmission,
-      photos: [{ angle: "front", objectKey: "users/u1/photos/v2.jpg" }],
+      photos: [{ angle: "front", objectKey: `users/${userId}/photos/v2.jpg` }],
     });
 
     const photos = await db.select().from(schema.assessmentPhotos);
     expect(photos).toHaveLength(1);
-    expect(photos[0]?.objectKey).toBe("users/u1/photos/v2.jpg");
+    expect(photos[0]?.objectKey).toBe(`users/${userId}/photos/v2.jpg`);
+  });
+
+  it("rejects a photo objectKey that doesn't belong to the requesting user, and persists nothing (IDOR guard)", async () => {
+    await expect(
+      submitAssessment(db, userId, {
+        ...validSubmission,
+        photos: [{ angle: "front", objectKey: "users/some-other-user-id/photos/front.jpg" }],
+      }),
+    ).rejects.toThrow();
+
+    const assessments = await db.select().from(schema.assessments);
+    const photos = await db.select().from(schema.assessmentPhotos);
+    expect(assessments).toHaveLength(0);
+    expect(photos).toHaveLength(0);
   });
 });

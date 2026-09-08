@@ -3,6 +3,7 @@ import { schema, type Database } from "@mogd/db";
 import { checkinSubmissionSchema, type CheckinSubmission } from "./schemas";
 import { computeTrainingAdherence } from "./trainingAdherence";
 import { runAdaptation, type RunAdaptationResult } from "../adaptation/runAdaptation";
+import { assertOwnsPrivatePhotoKey } from "../users/photoOwnership";
 
 export interface SubmitCheckinResult {
   checkinId: string;
@@ -23,6 +24,10 @@ export async function submitCheckin(
   rawInput: CheckinSubmission,
 ): Promise<SubmitCheckinResult> {
   const input = checkinSubmissionSchema.parse(rawInput);
+
+  for (const photo of input.photos) {
+    assertOwnsPrivatePhotoKey(userId, photo.objectKey);
+  }
 
   const [previous] = await db
     .select({ completedAt: schema.checkins.completedAt })

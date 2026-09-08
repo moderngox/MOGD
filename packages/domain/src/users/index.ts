@@ -4,3 +4,4 @@
  */
 export { getPrivatePhotoObjectKeys, deleteUser } from "./deleteAccount";
 export { listUsers, type AdminUserListItem } from "./adminQueries";
+export { assertOwnsPrivatePhotoKey, PhotoOwnershipError } from "./photoOwnership";

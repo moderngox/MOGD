@@ -49,4 +49,26 @@ describe("object key separation", () => {
   it("returns null when required media env vars are missing", () => {
     expect(loadMediaEnv({})).toBeNull();
   });
+
+  it("rejects a photoId containing a path-traversal sequence rather than building an escaping key", () => {
+    // Server Action parameter types are compile-time only, so a raw request
+    // could send anything here — without this guard, aws4fetch's `new
+    // URL(...)` normalizes the `..` segments before signing, producing a
+    // validly-signed presigned URL for an entirely different object outside
+    // this user's own prefix (the M6 security review's path-traversal
+    // finding).
+    expect(() =>
+      privatePhotoObjectKey({
+        userId: "user_1",
+        photoId: "x/../../../../users/victim-id/photos/front",
+        extension: "jpg",
+      }),
+    ).toThrow();
+  });
+
+  it("rejects a photoId containing a slash even without full traversal", () => {
+    expect(() =>
+      privatePhotoObjectKey({ userId: "user_1", photoId: "a/b", extension: "jpg" }),
+    ).toThrow();
+  });
 });

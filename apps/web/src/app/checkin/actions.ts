@@ -4,6 +4,10 @@ import { auth } from "@/auth";
 import { getDb } from "@mogd/db";
 import { checkins } from "@mogd/domain";
 import { loadMediaEnv, getPrivatePhotoUploadUrl, privatePhotoObjectKey } from "@mogd/media";
+import { z } from "zod";
+
+const angleSchema = z.enum(checkins.PHOTO_ANGLE_OPTIONS);
+const extensionSchema = z.enum(["jpg", "jpeg", "png", "webp"]);
 
 export interface PhotoUploadUrlResult {
   available: boolean;
@@ -15,13 +19,18 @@ export interface PhotoUploadUrlResult {
  * direct-to-R2 upload, "unavailable" rather than throwing when R2 isn't
  * configured (docs/PRODUCT.md: photos are always optional). */
 export async function getCheckinPhotoUploadUrlAction(
-  angle: "front" | "side",
-  extension: "jpg" | "jpeg" | "png" | "webp",
+  rawAngle: "front" | "side",
+  rawExtension: "jpg" | "jpeg" | "png" | "webp",
 ): Promise<PhotoUploadUrlResult> {
   const session = await auth();
   if (!session?.user?.id) {
     throw new Error("Not authenticated");
   }
+
+  // Server Action parameter types are compile-time only — a raw request can
+  // send any string, so re-validate before it flows into an R2 object key.
+  const angle = angleSchema.parse(rawAngle);
+  const extension = extensionSchema.parse(rawExtension);
 
   const env = loadMediaEnv();
   if (!env) {

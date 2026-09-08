@@ -50,12 +50,26 @@ describe("submitCheckin", () => {
   it("persists progress photos tied to the checkin", async () => {
     await submitCheckin(db, userId, {
       ...validSubmission,
-      photos: [{ angle: "front", objectKey: "users/u1/progress/p1.jpg" }],
+      photos: [{ angle: "front", objectKey: `users/${userId}/photos/p1.jpg` }],
     });
 
     const photos = await db.select().from(schema.progressPhotos);
     expect(photos).toHaveLength(1);
     expect(photos[0]?.angle).toBe("front");
+  });
+
+  it("rejects a photo objectKey that doesn't belong to the requesting user, and persists nothing (IDOR guard)", async () => {
+    await expect(
+      submitCheckin(db, userId, {
+        ...validSubmission,
+        photos: [{ angle: "front", objectKey: "users/some-other-user-id/photos/front.jpg" }],
+      }),
+    ).rejects.toThrow();
+
+    const checkins = await db.select().from(schema.checkins);
+    const photos = await db.select().from(schema.progressPhotos);
+    expect(checkins).toHaveLength(0);
+    expect(photos).toHaveLength(0);
   });
 
   it("rejects an out-of-range submission", async () => {
