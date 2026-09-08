@@ -38,6 +38,13 @@ function label(value: string): string {
   return value.replaceAll("_", " ");
 }
 
+function describeIssue(issue: { path: (string | number)[]; message: string } | undefined): string {
+  if (!issue) return "Please check this step.";
+  const fieldLabel = typeof issue.path[0] === "string" ? FIELD_LABELS[issue.path[0]] : undefined;
+  if (!fieldLabel) return issue.message;
+  return issue.message === "Required" ? `${fieldLabel} is required.` : `${fieldLabel}: ${issue.message}`;
+}
+
 type FormState = Partial<Omit<AssessmentSubmission, "photos">>;
 
 const STEP_TITLES = [
@@ -77,11 +84,53 @@ const DEFAULT_SESSIONS_PER_WEEK = 3;
 const DEFAULT_SESSION_DURATION_MIN = 45;
 const DEFAULT_MEALS_PER_DAY = 3;
 
+// Fields whose NumberStepper always shows a default (e.g. `form.age ?? DEFAULT_AGE`)
+// must also be seeded here. Otherwise the UI shows a value the user never
+// actually set, while the underlying field stays `undefined` until touched —
+// and z.coerce.number() turns that `undefined` into NaN on submit if the
+// step is passed without touching every slider.
+const INITIAL_FORM: FormState = {
+  physiquePriorities: [],
+  equipment: [],
+  age: DEFAULT_AGE,
+  heightCm: DEFAULT_HEIGHT_CM,
+  weightKg: DEFAULT_WEIGHT_KG,
+  waistCm: DEFAULT_WAIST_CM,
+  sessionsPerWeek: DEFAULT_SESSIONS_PER_WEEK,
+  sessionDurationMinutes: DEFAULT_SESSION_DURATION_MIN,
+  mealsPerDay: DEFAULT_MEALS_PER_DAY,
+};
+
+// Human labels for schema fields, used to turn zod's bare "Required" (or
+// other) messages into something that names the actual field — the raw
+// message alone doesn't say which input on the step is at fault.
+const FIELD_LABELS: Record<string, string> = {
+  primaryGoal: "Primary goal",
+  physiquePriorities: "Physique priorities",
+  sex: "Sex",
+  age: "Age",
+  heightCm: "Height",
+  weightKg: "Weight",
+  waistCm: "Waist",
+  targetWeightKg: "Target weight",
+  experienceLevel: "Experience level",
+  trainingConsistency: "Recent consistency",
+  currentActivityLevel: "Current activity level",
+  sessionsPerWeek: "Sessions per week",
+  sessionDurationMinutes: "Session duration",
+  trainingContext: "Training location",
+  equipment: "Equipment",
+  dietaryPreference: "Dietary preference",
+  mealsPerDay: "Meals per day",
+  cookingPreference: "Cooking preference",
+  optionalNote: "Note",
+};
+
 export function AssessmentWizard({ photosAvailable }: { photosAvailable: boolean }) {
   const router = useRouter();
   const [started, setStarted] = useState(false);
   const [step, setStep] = useState(0);
-  const [form, setForm] = useState<FormState>({ physiquePriorities: [], equipment: [] });
+  const [form, setForm] = useState<FormState>(INITIAL_FORM);
   const [photoFiles, setPhotoFiles] = useState<{ front?: File; side?: File }>({});
   const [consent, setConsent] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -123,7 +172,7 @@ export function AssessmentWizard({ photosAvailable }: { photosAvailable: boolean
         return true;
     }
     if (!result.success) {
-      setError(result.error.issues[0]?.message ?? "Please check this step.");
+      setError(describeIssue(result.error.issues[0]));
       return false;
     }
     return true;
