@@ -12,13 +12,34 @@ import {
   Card,
   DumbbellIcon,
   HomeIcon,
+  PowerIcon,
   ProgressBar,
   ProgressIcon,
   SidebarNav,
   Sparkline,
+  Wordmark,
 } from "@mogd/ui";
 
 const MS_PER_WEEK = 7 * 24 * 60 * 60 * 1000;
+
+async function signOutAction() {
+  "use server";
+  await signOut({ redirectTo: "/" });
+}
+
+function SignOutButton({ className }: { className?: string }) {
+  return (
+    <form action={signOutAction} className={className}>
+      <button
+        type="submit"
+        aria-label="Sign out"
+        className="flex h-9 w-9 items-center justify-center rounded-full border border-border bg-surface-elevated text-fg-secondary transition-colors hover:border-border-strong hover:text-status-warning"
+      >
+        <PowerIcon className="h-5 w-5" />
+      </button>
+    </form>
+  );
+}
 
 const STATUS_BADGE = {
   logged: { variant: "positive", label: "Logged" },
@@ -76,12 +97,7 @@ export default async function DashboardPage() {
   const weekNumber = program
     ? Math.max(1, Math.floor((Date.now() - program.createdAt.getTime()) / MS_PER_WEEK) + 1)
     : null;
-  const eyebrow = [
-    formatLabel(strategy?.primaryGoal ?? summary.primaryGoal).toUpperCase(),
-    weekNumber !== null ? `WEEK ${weekNumber}` : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  const goalLabel = formatLabel(strategy?.primaryGoal ?? summary.primaryGoal).toUpperCase();
 
   const navItems = [
     { href: "/dashboard", label: "Today", active: true, icon: <HomeIcon /> },
@@ -95,22 +111,21 @@ export default async function DashboardPage() {
       <SidebarNav items={navItems} />
 
       <div className="flex flex-1 flex-col">
+        <div className="flex items-center justify-between border-b border-border bg-bg px-5 py-3 md:hidden">
+          <Wordmark size="compact" />
+          <SignOutButton />
+        </div>
+
         <header className="flex items-center justify-between gap-3 border-b border-border bg-bg px-8 py-3">
-          <span className="text-xs font-semibold uppercase tracking-wide text-fg-secondary">{eyebrow}</span>
+          <span className="flex items-baseline gap-1.5 text-xs font-semibold uppercase tracking-wide">
+            <span className="text-accent">{goalLabel}</span>
+            {weekNumber !== null && <span className="text-fg-secondary">· Week {weekNumber}</span>}
+          </span>
           <div className="flex items-center gap-4">
             <Link href="/account" className="text-sm text-fg-secondary hover:text-fg-secondary-alt">
               Account settings
             </Link>
-            <form
-              action={async () => {
-                "use server";
-                await signOut({ redirectTo: "/" });
-              }}
-            >
-              <Button variant="secondary" type="submit">
-                Sign out
-              </Button>
-            </form>
+            <SignOutButton className="hidden md:block" />
           </div>
         </header>
 

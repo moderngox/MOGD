@@ -10,8 +10,9 @@ export { ProgressBar, type ProgressBarProps, type ProgressBarVariant } from "./P
 export { Sparkline, type SparklineProps } from "./Sparkline";
 export { SidebarNav, type SidebarNavProps, type SidebarNavItem } from "./SidebarNav";
 export { BottomNav, type BottomNavProps } from "./BottomNav";
+export { Wordmark, type WordmarkProps } from "./Wordmark";
 export { StepMeter, type StepMeterProps } from "./StepMeter";
 export { ChoiceCard, type ChoiceCardProps, type ChoiceCardVariant } from "./ChoiceCard";
 export { NumberStepper, type NumberStepperProps } from "./NumberStepper";
 export { cn } from "./cn";
-export { HomeIcon, DumbbellIcon, AppleIcon, ProgressIcon } from "./icons";
+export { HomeIcon, DumbbellIcon, AppleIcon, ProgressIcon, PowerIcon } from "./icons";

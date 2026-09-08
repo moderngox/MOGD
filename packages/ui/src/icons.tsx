@@ -61,3 +61,13 @@ export function ProgressIcon(props: SVGProps<SVGSVGElement>) {
     </IconBase>
   );
 }
+
+/** Standby/power glyph — used for the icon-only sign-out control. */
+export function PowerIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <IconBase {...props}>
+      <path d="M12 4v7" />
+      <path d="M7.5 6.5a7.5 7.5 0 1 0 9 0" />
+    </IconBase>
+  );
+}

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { cn } from "./cn";
+import { Wordmark } from "./Wordmark";
 
 export interface SidebarNavItem {
   href: string;
@@ -27,16 +28,7 @@ export function SidebarNav({ items, homeHref = "/dashboard", className }: Sideba
         className,
       )}
     >
-      <div className="flex flex-col gap-3">
-        <a
-          href={homeHref}
-          aria-label="MOGD home"
-          className="inline-flex items-start font-display text-3xl tracking-[.18em] text-fg"
-        >
-          MOG<span className="ml-[-3px] text-base leading-none">D</span>
-        </a>
-        <span aria-hidden="true" className="block h-0.5 w-7 bg-accent" />
-      </div>
+      <Wordmark href={homeHref} />
       <ul className="flex flex-col gap-1">
         {items.map((item) => (
           <li key={item.label}>
