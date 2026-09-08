@@ -85,7 +85,8 @@ The mockup's observed padding/gap values (2, 4, 6, 8, 10, 12, 14, 16, 20, 24px) 
 
 ### App shell
 
-- **Desktop:** fixed 224px sidebar — MOGᴰ wordmark (Barlow Condensed, `letter-spacing: .18em`, superscript D) with a 28×2px accent underline beneath it, then a vertical nav list (Today/Training/Nutrition/Progress). The active item shows an accent dot + brighter (`--color-fg-secondary-alt`) text; inactive items use `--color-fg-secondary`. "Ask coach" and "Profile and settings" are pinned to the bottom of the sidebar — in this pass they render as plain nav links to real routes, not the chat/settings features themselves (those are reference-only, §3).
+- **Desktop (`md` and up):** fixed 224px sidebar — MOGᴰ wordmark (Barlow Condensed, `letter-spacing: .18em`, superscript D) with a 28×2px accent underline beneath it, then a vertical nav list (Today/Training/Nutrition/Progress), each item paired with a dependency-free inline-SVG icon (home/dumbbell/apple/bar-chart — `@mogd/ui`'s `icons.tsx`). The active item shows an accent icon + brighter (`--color-fg-secondary-alt`) text; inactive items use `--color-fg-secondary` text with a muted (`--color-fg-muted`) icon. "Ask coach" and "Profile and settings" are pinned to the bottom of the sidebar — in this pass they render as plain nav links to real routes, not the chat/settings features themselves (those are reference-only, §3).
+- **Mobile/tablet (below `md`):** the sidebar is hidden and a fixed bottom tab bar (`BottomNav`) takes its place, per the mobile-first confirmed direction above — same four items and icons, icon above label, the active tab fully accent-colored.
 - **Header:** breadcrumb-style eyebrow (`label` scale) on the left, computed as `"{{ energyDirection label }} · WEEK {{ elapsed weeks since program.createdAt }}"` — with no fixed denominator (no "OF 12": there's no fixed-length phase concept in the data model, see `packages/db/src/schema/programs.ts`).
 - **Main content:** max-width 1280px, responsive gutter padding.
 
@@ -113,7 +114,8 @@ Same sidebar/header shell as the dashboard, for a consistent app chrome. The for
 - `BigStat` — Barlow Condensed value + Inter label underneath, optional unit and trailing note.
 - `ProgressBar` — track (`--color-surface-elevated`) + fill (accent or a status color).
 - `Sparkline` — dependency-free inline SVG polyline, accent-colored, no axes/gridlines/tooltips.
-- `SidebarNav` — wordmark + accent underline + nav list as described above.
+- `SidebarNav` — wordmark + accent underline + icon nav list as described above; hidden below `md`.
+- `BottomNav` — fixed bottom icon tab bar, same item list; shown only below `md`.
 
 ## 3. Reference screens (not built — documented for future milestones)
 

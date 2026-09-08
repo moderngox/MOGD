@@ -1,9 +1,11 @@
+import type { ReactNode } from "react";
 import { cn } from "./cn";
 
 export interface SidebarNavItem {
   href: string;
   label: string;
   active?: boolean;
+  icon?: ReactNode;
 }
 
 export interface SidebarNavProps {
@@ -20,7 +22,10 @@ export function SidebarNav({ items, homeHref = "/dashboard", className }: Sideba
   return (
     <nav
       aria-label="Primary"
-      className={cn("flex w-56 flex-none flex-col gap-6 border-r border-border bg-bg p-5", className)}
+      className={cn(
+        "hidden w-56 flex-none flex-col gap-6 border-r border-border bg-bg p-5 md:flex",
+        className,
+      )}
     >
       <div className="flex flex-col gap-3">
         <a
@@ -43,10 +48,14 @@ export function SidebarNav({ items, homeHref = "/dashboard", className }: Sideba
                 item.active ? "text-fg-secondary-alt" : "text-fg-secondary hover:text-fg-secondary-alt",
               )}
             >
-              <span
-                aria-hidden="true"
-                className={cn("h-1.5 w-1.5 rounded-full", item.active ? "bg-accent" : "bg-transparent")}
-              />
+              {item.icon ? (
+                <span className={cn("h-4 w-4", item.active ? "text-accent" : "text-fg-muted")}>{item.icon}</span>
+              ) : (
+                <span
+                  aria-hidden="true"
+                  className={cn("h-1.5 w-1.5 rounded-full", item.active ? "bg-accent" : "bg-transparent")}
+                />
+              )}
               {item.label}
             </a>
           </li>

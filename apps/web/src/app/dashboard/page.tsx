@@ -3,7 +3,20 @@ import { redirect } from "next/navigation";
 import { auth, signOut } from "@/auth";
 import { getDb } from "@mogd/db";
 import { assessment, nutrition, programs, checkins, adaptation } from "@mogd/domain";
-import { Badge, BigStat, Button, Card, ProgressBar, SidebarNav, Sparkline } from "@mogd/ui";
+import {
+  AppleIcon,
+  Badge,
+  BigStat,
+  BottomNav,
+  Button,
+  Card,
+  DumbbellIcon,
+  HomeIcon,
+  ProgressBar,
+  ProgressIcon,
+  SidebarNav,
+  Sparkline,
+} from "@mogd/ui";
 
 const MS_PER_WEEK = 7 * 24 * 60 * 60 * 1000;
 
@@ -70,16 +83,16 @@ export default async function DashboardPage() {
     .filter(Boolean)
     .join(" · ");
 
+  const navItems = [
+    { href: "/dashboard", label: "Today", active: true, icon: <HomeIcon /> },
+    { href: "/program", label: "Training", icon: <DumbbellIcon /> },
+    { href: "/checkin", label: "Nutrition", icon: <AppleIcon /> },
+    { href: "/checkin", label: "Progress", icon: <ProgressIcon /> },
+  ];
+
   return (
     <div className="flex min-h-screen">
-      <SidebarNav
-        items={[
-          { href: "/dashboard", label: "Today", active: true },
-          { href: "/program", label: "Training" },
-          { href: "/checkin", label: "Nutrition" },
-          { href: "/checkin", label: "Progress" },
-        ]}
-      />
+      <SidebarNav items={navItems} />
 
       <div className="flex flex-1 flex-col">
         <header className="flex items-center justify-between gap-3 border-b border-border bg-bg px-8 py-3">
@@ -101,7 +114,7 @@ export default async function DashboardPage() {
           </div>
         </header>
 
-        <main className="mx-auto flex w-full max-w-[1280px] flex-col gap-4 px-8 py-6">
+        <main className="mx-auto flex w-full max-w-[1280px] flex-col gap-4 px-8 py-6 pb-24 md:pb-6">
           <h1 className="font-display text-3xl font-semibold text-fg">
             Today · {new Date().toLocaleDateString(undefined, { day: "numeric", month: "short" })}
           </h1>
@@ -242,6 +255,8 @@ export default async function DashboardPage() {
           </div>
         </main>
       </div>
+
+      <BottomNav items={navItems} />
     </div>
   );
 }
