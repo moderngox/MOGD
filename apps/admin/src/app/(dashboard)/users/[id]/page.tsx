@@ -63,7 +63,7 @@ export default async function AdminUserDetailPage({
             <dt className="text-zinc-500">Training</dt>
             <dd>
               {profile.sessionsPerWeek}/week · {profile.sessionDurationMinutes} min ·{" "}
-              {label(profile.trainingContext)}
+              {profile.trainingContext.map(label).join(", ")}
             </dd>
             <dt className="text-zinc-500">Nutrition profile</dt>
             <dd>

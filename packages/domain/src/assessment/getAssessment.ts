@@ -15,7 +15,7 @@ export interface UserAssessmentSummary {
   experienceLevel: string;
   sessionsPerWeek: number;
   sessionDurationMinutes: number;
-  trainingContext: string;
+  trainingContext: string[];
   dietaryPreference: string;
   mealsPerDay: number;
 }

@@ -103,7 +103,7 @@ async function seedUser(db: Database) {
     currentActivityLevel: "moderately_active",
     sessionsPerWeek: 2,
     sessionDurationMinutes: 60,
-    trainingContext: "gym",
+    trainingContext: ["gym"],
     equipment: ["dumbbells", "pull_up_bar"],
   });
 

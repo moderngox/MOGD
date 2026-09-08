@@ -78,7 +78,7 @@ export const trainingProfiles = sqliteTable("training_profile", {
   injuryRestrictions: text("injuryRestrictions"),
   sessionsPerWeek: integer("sessionsPerWeek").notNull(),
   sessionDurationMinutes: integer("sessionDurationMinutes").notNull(),
-  trainingContext: text("trainingContext").notNull(),
+  trainingContext: text("trainingContext", { mode: "json" }).$type<string[]>().notNull(),
   equipment: text("equipment", { mode: "json" }).$type<string[]>().notNull(),
   updatedAt: integer("updatedAt", { mode: "timestamp_ms" })
     .notNull()

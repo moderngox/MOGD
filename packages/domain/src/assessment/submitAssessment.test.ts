@@ -17,7 +17,7 @@ const validSubmission: AssessmentSubmission = {
   currentActivityLevel: "moderately_active",
   sessionsPerWeek: 4,
   sessionDurationMinutes: 60,
-  trainingContext: "gym",
+  trainingContext: ["gym"],
   equipment: ["barbell", "dumbbells"],
   dietaryPreference: "standard",
   mealsPerDay: 3,

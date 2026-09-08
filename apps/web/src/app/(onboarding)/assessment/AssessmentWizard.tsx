@@ -93,6 +93,7 @@ const DEFAULT_MEALS_PER_DAY = 3;
 const INITIAL_FORM: FormState = {
   physiquePriorities: [],
   equipment: [],
+  trainingContext: [],
   age: DEFAULT_AGE,
   heightCm: DEFAULT_HEIGHT_CM,
   weightKg: DEFAULT_WEIGHT_KG,
@@ -220,6 +221,14 @@ export function AssessmentWizard({
     } else if (current.length < MAX_PHYSIQUE_PRIORITIES) {
       set("physiquePriorities", [...current, value]);
     }
+  }
+
+  function toggleTrainingContext(value: (typeof TRAINING_CONTEXT_OPTIONS)[number]) {
+    const current = form.trainingContext ?? [];
+    set(
+      "trainingContext",
+      current.includes(value) ? current.filter((v) => v !== value) : [...current, value],
+    );
   }
 
   function toggleEquipment(value: (typeof EQUIPMENT_OPTIONS)[number]) {
@@ -617,15 +626,15 @@ export function AssessmentWizard({
             />
             <div className="flex flex-col gap-2">
               <span className="text-sm font-medium text-fg-secondary-alt">Where do you train?</span>
-              <div role="radiogroup" aria-label="Training context" className="flex flex-wrap gap-2">
+              <div role="group" aria-label="Training context" className="flex flex-wrap gap-2">
                 {TRAINING_CONTEXT_OPTIONS.map((o) => (
                   <ChoiceCard
                     key={o}
-                    role="radio"
+                    role="checkbox"
                     variant="pill"
                     label={label(o)}
-                    selected={form.trainingContext === o}
-                    onSelect={() => set("trainingContext", o)}
+                    selected={(form.trainingContext ?? []).includes(o)}
+                    onSelect={() => toggleTrainingContext(o)}
                   />
                 ))}
               </div>

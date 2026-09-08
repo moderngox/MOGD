@@ -50,7 +50,7 @@ export const trainingHistoryStepSchema = z.object({
 export const availabilityStepSchema = z.object({
   sessionsPerWeek: z.coerce.number().int().min(1).max(7),
   sessionDurationMinutes: z.coerce.number().int().min(15).max(180),
-  trainingContext: z.enum(TRAINING_CONTEXT_OPTIONS),
+  trainingContext: z.array(z.enum(TRAINING_CONTEXT_OPTIONS)).min(1, "Select at least one"),
   equipment: z.array(z.enum(EQUIPMENT_OPTIONS)).default([]),
 });
 
