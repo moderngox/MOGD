@@ -35,7 +35,7 @@ export const ACTIVITY_LEVEL_OPTIONS = [
 ] as const;
 export type ActivityLevel = (typeof ACTIVITY_LEVEL_OPTIONS)[number];
 
-export const TRAINING_CONTEXT_OPTIONS = ["gym", "home", "bodyweight"] as const;
+export const TRAINING_CONTEXT_OPTIONS = ["gym", "home", "outdoor"] as const;
 export type TrainingContext = (typeof TRAINING_CONTEXT_OPTIONS)[number];
 
 // Shared with the exercise catalog's equipment requirements — see
