@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { AuthError } from "next-auth";
 import { signIn } from "@/auth";
 import { isLockedOut, recordFailedAttempt } from "@mogd/shared/auth";
@@ -36,7 +37,10 @@ export default async function SignInPage({
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-4 p-8">
+    <main className="relative mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-4 p-8">
+      <p className="absolute left-1/2 top-16 -translate-x-1/2 text-4xl font-semibold tracking-tight">
+        MOG<span className="align-super text-2xl">D</span>
+      </p>
       <h1 className="text-2xl font-semibold">Sign in</h1>
       {errorParam === "rate_limited" ? (
         <p className="text-sm text-red-400">Too many attempts. Try again in a few minutes.</p>
@@ -54,6 +58,12 @@ export default async function SignInPage({
         />
         <Button type="submit">Sign in</Button>
       </form>
+      <p className="text-center text-sm text-fg-secondary">
+        Don&apos;t have an account?{" "}
+        <Link href="/sign-up" className="text-accent hover:text-accent-hover">
+          Create one
+        </Link>
+      </p>
     </main>
   );
 }

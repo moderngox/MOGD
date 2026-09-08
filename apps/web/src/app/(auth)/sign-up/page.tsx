@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { getDb } from "@mogd/db";
 import { registerUser, EmailAlreadyRegisteredError, isLockedOut, recordFailedAttempt } from "@mogd/shared/auth";
 import { signIn } from "@/auth";
@@ -41,7 +42,10 @@ export default async function SignUpPage({
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-4 p-8">
+    <main className="relative mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-4 p-8">
+      <p className="absolute left-1/2 top-16 -translate-x-1/2 text-4xl font-semibold tracking-tight">
+        MOG<span className="align-super text-2xl">D</span>
+      </p>
       <h1 className="text-2xl font-semibold">Create account</h1>
       {errorParam === "email_taken" ? (
         <p className="text-sm text-red-400">An account with this email already exists.</p>
@@ -64,6 +68,12 @@ export default async function SignUpPage({
         />
         <Button type="submit">Create account</Button>
       </form>
+      <p className="text-center text-sm text-fg-secondary">
+        Already have an account?{" "}
+        <Link href="/sign-in" className="text-accent hover:text-accent-hover">
+          Sign in
+        </Link>
+      </p>
     </main>
   );
 }
