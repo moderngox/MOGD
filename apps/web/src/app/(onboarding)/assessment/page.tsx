@@ -5,18 +5,31 @@ import { assessment } from "@mogd/domain";
 import { loadMediaEnv } from "@mogd/media";
 import { AssessmentWizard } from "./AssessmentWizard";
 
-export default async function AssessmentPage() {
+export default async function AssessmentPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ edit?: string }>;
+}) {
   const session = await auth();
   if (!session?.user?.id) {
     redirect("/sign-in");
   }
 
-  const existing = await assessment.getUserAssessment(getDb(), session.user.id);
-  if (existing) {
+  const { edit } = await searchParams;
+  const db = getDb();
+  const existing = await assessment.getUserAssessment(db, session.user.id);
+
+  // Editing re-opens the wizard pre-filled with the completed assessment
+  // (see AssessmentWizard's initialDraft prop). Anyone else hitting this
+  // route after finishing onboarding still gets bounced to the dashboard —
+  // docs/PRODUCT.md: the dashboard is the home once an assessment exists.
+  if (existing && edit !== "1") {
     redirect("/dashboard");
   }
 
-  const draft = await assessment.getDraft(getDb(), session.user.id);
+  const draft = existing
+    ? { step: 0, formState: (await assessment.getAssessmentFormState(db, session.user.id)) ?? {} }
+    : await assessment.getDraft(db, session.user.id);
   const photosAvailable = loadMediaEnv() !== null;
 
   return (
