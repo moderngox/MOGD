@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { ZodError } from "zod";
 import { Button, Card, Checkbox, Input, Select, Textarea } from "@mogd/ui";
 import { exercises, physique } from "@mogd/domain";
 import { createExerciseAction, updateExerciseAction } from "./actions";
@@ -97,7 +98,13 @@ export function ExerciseForm({
         router.push(`/exercises/${created.id}`);
       }
     } catch (err) {
-      if (err instanceof Error && err.message.includes("already exists")) {
+      if (err instanceof ZodError) {
+        setError(
+          err.issues
+            .map((issue) => `${issue.path.join(".") || "form"}: ${issue.message}`)
+            .join("; "),
+        );
+      } else if (err instanceof Error && err.message.includes("already exists")) {
         setError(err.message);
       } else {
         setError("Could not save. Check required fields.");
@@ -116,13 +123,13 @@ export function ExerciseForm({
           </p>
         ) : (
           <Input
-            placeholder="canonicalId (e.g. incline_dumbbell_press)"
+            placeholder="canonicalId (e.g. incline_dumbbell_press) *"
             value={form.canonicalId}
             onChange={(e) => set("canonicalId", e.target.value)}
           />
         )}
 
-        <Input placeholder="Name" value={form.name} onChange={(e) => set("name", e.target.value)} />
+        <Input placeholder="Name *" value={form.name} onChange={(e) => set("name", e.target.value)} />
 
         <Checkbox
           id="isActive"
@@ -136,7 +143,7 @@ export function ExerciseForm({
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Select value={form.movementPattern} onChange={(e) => set("movementPattern", e.target.value)}>
             <option value="" disabled>
-              Movement pattern
+              Movement pattern *
             </option>
             {MOVEMENT_PATTERN_OPTIONS.map((o) => (
               <option key={o} value={o}>
@@ -147,7 +154,7 @@ export function ExerciseForm({
 
           <Select value={form.difficulty} onChange={(e) => set("difficulty", e.target.value)}>
             <option value="" disabled>
-              Difficulty
+              Difficulty *
             </option>
             {EXERCISE_DIFFICULTY_OPTIONS.map((o) => (
               <option key={o} value={o}>
@@ -159,7 +166,7 @@ export function ExerciseForm({
 
         <div>
           <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-fg-secondary">
-            Primary muscles
+            Primary muscles * (at least one)
           </p>
           <div className="grid grid-cols-2 gap-1 sm:grid-cols-3">
             {CANONICAL_MUSCLE_GROUPS.map((m) => (
