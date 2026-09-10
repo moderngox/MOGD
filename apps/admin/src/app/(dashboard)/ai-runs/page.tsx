@@ -1,5 +1,12 @@
 import { desc } from "drizzle-orm";
 import { getDb, schema } from "@mogd/db";
+import { Badge } from "@mogd/ui";
+
+const STATUS_BADGE = {
+  accepted: "positive",
+  rejected: "warning",
+  error: "warning",
+} as const;
 
 export default async function AdminAiRunsPage() {
   const runs = await getDb()
@@ -10,40 +17,49 @@ export default async function AdminAiRunsPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-2xl font-semibold">AI Runs</h1>
-      <p className="text-zinc-400">
-        Every structured-generation call is logged here, including rejected
-        and errored runs (docs/AI_AND_SAFETY.md "AI run logging").
-      </p>
+      <div>
+        <h1 className="font-display text-3xl font-semibold text-fg">AI Runs</h1>
+        <p className="text-sm text-fg-secondary">
+          Every structured-generation call is logged here, including rejected and errored runs
+          (docs/AI_AND_SAFETY.md &quot;AI run logging&quot;).
+        </p>
+      </div>
+
       {runs.length === 0 ? (
-        <p className="text-sm text-zinc-500">No AI runs recorded yet.</p>
+        <p className="rounded-lg border border-dashed border-border bg-surface-alt p-6 text-center text-sm text-fg-secondary">
+          No AI runs recorded yet.
+        </p>
       ) : (
-        <table className="w-full text-left text-sm">
-          <thead className="text-zinc-500">
-            <tr>
-              <th className="py-2 pr-4">Purpose</th>
-              <th className="py-2 pr-4">Provider / model</th>
-              <th className="py-2 pr-4">Status</th>
-              <th className="py-2 pr-4">Latency</th>
-              <th className="py-2 pr-4">Created</th>
-            </tr>
-          </thead>
-          <tbody>
-            {runs.map((run) => (
-              <tr key={run.id} className="border-t border-zinc-800">
-                <td className="py-2 pr-4">{run.purpose}</td>
-                <td className="py-2 pr-4">
-                  {run.provider} / {run.model}
-                </td>
-                <td className="py-2 pr-4">{run.validationStatus}</td>
-                <td className="py-2 pr-4">{run.latencyMs}ms</td>
-                <td className="py-2 pr-4">
-                  {new Date(run.createdAt).toISOString()}
-                </td>
+        <div className="overflow-x-auto rounded-lg border border-border">
+          <table className="w-full min-w-[640px] text-left text-sm">
+            <thead>
+              <tr className="border-b border-border text-xs font-semibold uppercase tracking-wide text-fg-secondary">
+                <th className="px-4 py-2.5 font-semibold">Purpose</th>
+                <th className="px-4 py-2.5 font-semibold">Provider / model</th>
+                <th className="px-4 py-2.5 font-semibold">Status</th>
+                <th className="px-4 py-2.5 font-semibold">Latency</th>
+                <th className="px-4 py-2.5 font-semibold">Created</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {runs.map((run) => (
+                <tr key={run.id} className="hover:bg-surface-elevated/40">
+                  <td className="px-4 py-2.5 font-medium text-fg">{run.purpose}</td>
+                  <td className="px-4 py-2.5 text-fg-secondary-alt">
+                    {run.provider} / {run.model}
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <Badge variant={STATUS_BADGE[run.validationStatus as keyof typeof STATUS_BADGE] ?? "neutral"}>
+                      {run.validationStatus}
+                    </Badge>
+                  </td>
+                  <td className="px-4 py-2.5 tabular-nums text-fg-secondary-alt">{run.latencyMs}ms</td>
+                  <td className="px-4 py-2.5 text-fg-secondary">{new Date(run.createdAt).toISOString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

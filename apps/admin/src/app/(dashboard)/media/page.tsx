@@ -28,11 +28,13 @@ export default async function AdminMediaPage({
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-2xl font-semibold">Media</h1>
-      <p className="text-sm text-zinc-500">
-        Select exercise → upload reviewed MP4/thumbnail → preview → approve → publish.
-        Generation stays external and manual (docs/ARCHITECTURE.md §20, CLAUDE.md rule 7).
-      </p>
+      <div>
+        <h1 className="font-display text-3xl font-semibold text-fg">Media</h1>
+        <p className="text-sm text-fg-secondary">
+          Select exercise → upload reviewed MP4/thumbnail → preview → approve → publish.
+          Generation stays external and manual (docs/ARCHITECTURE.md §20, CLAUDE.md rule 7).
+        </p>
+      </div>
       <MediaManager
         exercises={exerciseList.map((e) => ({ id: e.id, name: e.name, canonicalId: e.canonicalId }))}
         selectedExerciseId={selected?.id ?? null}

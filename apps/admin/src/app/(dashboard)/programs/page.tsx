@@ -11,40 +11,46 @@ export default async function AdminProgramsPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-2xl font-semibold">Programs</h1>
-      <p className="text-zinc-400">
-        Goal strategy, nutrition targets, workouts, validation results and adjustments.
-      </p>
+      <div>
+        <h1 className="font-display text-3xl font-semibold text-fg">Programs</h1>
+        <p className="text-sm text-fg-secondary">
+          Goal strategy, nutrition targets, workouts, validation results and adjustments.
+        </p>
+      </div>
 
       {rows.length === 0 ? (
-        <p className="text-sm text-zinc-500">No programs generated yet.</p>
+        <p className="rounded-lg border border-dashed border-border bg-surface-alt p-6 text-center text-sm text-fg-secondary">
+          No programs generated yet.
+        </p>
       ) : (
-        <table className="w-full text-left text-sm">
-          <thead className="text-zinc-500">
-            <tr>
-              <th className="py-2 pr-4">User</th>
-              <th className="py-2 pr-4">Split</th>
-              <th className="py-2 pr-4">Sessions/week</th>
-              <th className="py-2 pr-4">Created</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((program) => (
-              <tr key={program.programId} className="border-t border-zinc-800">
-                <td className="py-2 pr-4">
-                  <Link href={`/users/${program.userId}`} className="hover:underline">
-                    {program.userEmail}
-                  </Link>
-                </td>
-                <td className="py-2 pr-4">{label(program.splitType)}</td>
-                <td className="py-2 pr-4">{program.sessionsPerWeek}</td>
-                <td className="py-2 pr-4">
-                  {new Date(program.createdAt).toISOString().slice(0, 10)}
-                </td>
+        <div className="overflow-x-auto rounded-lg border border-border">
+          <table className="w-full min-w-[520px] text-left text-sm">
+            <thead>
+              <tr className="border-b border-border text-xs font-semibold uppercase tracking-wide text-fg-secondary">
+                <th className="px-4 py-2.5 font-semibold">User</th>
+                <th className="px-4 py-2.5 font-semibold">Split</th>
+                <th className="px-4 py-2.5 font-semibold">Sessions/week</th>
+                <th className="px-4 py-2.5 font-semibold">Created</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {rows.map((program) => (
+                <tr key={program.programId} className="hover:bg-surface-elevated/40">
+                  <td className="px-4 py-2.5">
+                    <Link href={`/users/${program.userId}`} className="font-medium text-fg hover:text-accent">
+                      {program.userEmail}
+                    </Link>
+                  </td>
+                  <td className="px-4 py-2.5 text-fg-secondary-alt">{label(program.splitType)}</td>
+                  <td className="px-4 py-2.5 tabular-nums text-fg-secondary-alt">{program.sessionsPerWeek}</td>
+                  <td className="px-4 py-2.5 text-fg-secondary">
+                    {new Date(program.createdAt).toISOString().slice(0, 10)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

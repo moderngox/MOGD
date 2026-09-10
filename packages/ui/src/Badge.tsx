@@ -1,7 +1,7 @@
 import type { HTMLAttributes } from "react";
 import { cn } from "./cn";
 
-export type BadgeVariant = "current" | "positive" | "neutral" | "warning" | "info";
+export type BadgeVariant = "current" | "positive" | "neutral" | "caution" | "warning" | "info";
 
 export interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
   variant?: BadgeVariant;
@@ -11,6 +11,7 @@ const VARIANT_CLASSES: Record<BadgeVariant, string> = {
   current: "bg-accent text-bg",
   positive: "border border-status-positive/40 bg-status-positive/15 text-status-positive",
   neutral: "border border-border text-fg-secondary",
+  caution: "border border-status-caution/40 bg-status-caution/15 text-status-caution",
   warning: "border border-status-warning/40 bg-status-warning/15 text-status-warning",
   info: "border border-status-info/40 bg-status-info/15 text-status-info",
 };

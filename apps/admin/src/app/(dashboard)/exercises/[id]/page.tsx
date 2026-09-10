@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDb } from "@mogd/db";
 import { exercises } from "@mogd/domain";
+import { Badge, Button } from "@mogd/ui";
 import { ExerciseForm } from "../ExerciseForm";
 
 export default async function EditExercisePage({
@@ -15,10 +16,15 @@ export default async function EditExercisePage({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">{exercise.name}</h1>
-        <Link href={`/media?exerciseId=${exercise.id}`} className="text-sm text-zinc-400 hover:underline">
-          Manage media →
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <h1 className="font-display text-3xl font-semibold text-fg">{exercise.name}</h1>
+          <Badge variant={exercise.isActive ? "positive" : "neutral"}>
+            {exercise.isActive ? "Active" : "Inactive"}
+          </Badge>
+        </div>
+        <Link href={`/media?exerciseId=${exercise.id}`}>
+          <Button variant="outline">Manage media →</Button>
         </Link>
       </div>
       <ExerciseForm

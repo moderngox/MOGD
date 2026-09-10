@@ -71,3 +71,59 @@ export function PowerIcon(props: SVGProps<SVGSVGElement>) {
     </IconBase>
   );
 }
+
+/** Admin nav: Dashboard. */
+export function DashboardIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <IconBase {...props}>
+      <rect x="3.5" y="3.5" width="7" height="7" rx="1.25" />
+      <rect x="13.5" y="3.5" width="7" height="4.5" rx="1.25" />
+      <rect x="13.5" y="11" width="7" height="9.5" rx="1.25" />
+      <rect x="3.5" y="13.5" width="7" height="7" rx="1.25" />
+    </IconBase>
+  );
+}
+
+/** Admin nav: Users. */
+export function UsersIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <IconBase {...props}>
+      <circle cx="9" cy="8" r="3" />
+      <path d="M3.5 20c.9-3.6 3-5.5 5.5-5.5s4.6 1.9 5.5 5.5" />
+      <path d="M15.5 8.5a2.75 2.75 0 1 1 0 5.5" />
+      <path d="M16 14.6c2.2.4 3.7 2.2 4.4 5.4" />
+    </IconBase>
+  );
+}
+
+/** Admin nav: Media. */
+export function MediaIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <IconBase {...props}>
+      <rect x="3" y="4.5" width="18" height="14" rx="1.5" />
+      <path d="m3 15.5 5-4.5 4 3.5 3.5-3 5.5 4.5" />
+      <circle cx="8" cy="9" r="1.5" />
+    </IconBase>
+  );
+}
+
+/** Admin nav: Programs. */
+export function ProgramsIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <IconBase {...props}>
+      <rect x="5" y="3.5" width="14" height="17" rx="1.5" />
+      <path d="M9 3.5v-.75a.75.75 0 0 1 .75-.75h4.5a.75.75 0 0 1 .75.75v.75" />
+      <path d="M8.5 10h7M8.5 13.5h7M8.5 17h4.5" />
+    </IconBase>
+  );
+}
+
+/** Admin nav: AI Runs. */
+export function AiRunsIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <IconBase {...props}>
+      <rect x="7" y="7" width="10" height="10" rx="1.5" />
+      <path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.5 4.5l2 2M17.5 17.5l2 2M19.5 4.5l-2 2M6.5 17.5l-2 2" />
+    </IconBase>
+  );
+}

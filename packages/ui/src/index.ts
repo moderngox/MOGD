@@ -15,4 +15,15 @@ export { StepMeter, type StepMeterProps } from "./StepMeter";
 export { ChoiceCard, type ChoiceCardProps, type ChoiceCardVariant } from "./ChoiceCard";
 export { NumberStepper, type NumberStepperProps } from "./NumberStepper";
 export { cn } from "./cn";
-export { HomeIcon, DumbbellIcon, AppleIcon, ProgressIcon, PowerIcon } from "./icons";
+export {
+  HomeIcon,
+  DumbbellIcon,
+  AppleIcon,
+  ProgressIcon,
+  PowerIcon,
+  DashboardIcon,
+  UsersIcon,
+  MediaIcon,
+  ProgramsIcon,
+  AiRunsIcon,
+} from "./icons";

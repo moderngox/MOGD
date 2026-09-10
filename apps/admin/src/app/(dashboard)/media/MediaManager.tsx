@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Select } from "@mogd/ui";
+import { Badge, Button, Card, Select } from "@mogd/ui";
 import { getAssetUploadUrlAction, createDraftAssetAction, approveAssetAction, archiveAssetAction } from "./actions";
 
 export interface ExerciseOption {
@@ -19,6 +19,12 @@ export interface AssetRow {
   validationNotes: string | null;
   previewUrl: string | null;
 }
+
+const ASSET_BADGE = {
+  approved: "positive",
+  draft: "caution",
+  archived: "neutral",
+} as const;
 
 export function MediaManager({
   exercises,
@@ -88,10 +94,7 @@ export function MediaManager({
 
   return (
     <div className="flex flex-col gap-4">
-      <Select
-        value={selectedExerciseId ?? ""}
-        onChange={(e) => selectExercise(e.target.value)}
-      >
+      <Select value={selectedExerciseId ?? ""} onChange={(e) => selectExercise(e.target.value)} className="max-w-md">
         <option value="">Select an exercise…</option>
         {exercises.map((ex) => (
           <option key={ex.id} value={ex.id}>
@@ -101,65 +104,61 @@ export function MediaManager({
       </Select>
 
       {!selectedExerciseId ? (
-        <p className="text-sm text-zinc-500">Select an exercise to manage its media.</p>
+        <p className="rounded-lg border border-dashed border-border bg-surface-alt p-6 text-center text-sm text-fg-secondary">
+          Select an exercise to manage its media.
+        </p>
       ) : !mediaAvailable ? (
-        <p className="text-sm text-zinc-500">
+        <p className="rounded-lg border border-dashed border-border bg-surface-alt p-6 text-center text-sm text-fg-secondary">
           R2 media storage isn&apos;t configured in this environment.
         </p>
       ) : (
         <>
-          <div className="flex items-center gap-3">
-            <Select
-              value={assetType}
-              onChange={(e) => setAssetType(e.target.value as "video" | "thumbnail")}
-            >
-              <option value="video">Video</option>
-              <option value="thumbnail">Thumbnail</option>
-            </Select>
-            <label>
-              <input
-                type="file"
-                accept={assetType === "video" ? "video/mp4" : "image/jpeg"}
-                disabled={uploading}
-                className="text-sm text-zinc-400"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) void handleUpload(file);
-                }}
-              />
-            </label>
-            {uploading && <span className="text-sm text-zinc-500">Uploading…</span>}
-          </div>
-
-          {error && <p className="text-sm text-red-400">{error}</p>}
+          <Card title="Upload">
+            <div className="flex flex-wrap items-center gap-3">
+              <Select
+                value={assetType}
+                onChange={(e) => setAssetType(e.target.value as "video" | "thumbnail")}
+                className="w-auto"
+              >
+                <option value="video">Video</option>
+                <option value="thumbnail">Thumbnail</option>
+              </Select>
+              <label>
+                <input
+                  type="file"
+                  accept={assetType === "video" ? "video/mp4" : "image/jpeg"}
+                  disabled={uploading}
+                  className="text-sm text-fg-secondary file:mr-3 file:rounded-md file:border file:border-border file:bg-surface-elevated file:px-3 file:py-1.5 file:text-sm file:text-fg"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) void handleUpload(file);
+                  }}
+                />
+              </label>
+              {uploading && <span className="text-sm text-fg-secondary">Uploading…</span>}
+            </div>
+            {error && <p className="text-sm text-status-warning">{error}</p>}
+          </Card>
 
           {assets.length === 0 ? (
-            <p className="text-sm text-zinc-500">No media uploaded for this exercise yet.</p>
+            <p className="rounded-lg border border-dashed border-border bg-surface-alt p-6 text-center text-sm text-fg-secondary">
+              No media uploaded for this exercise yet.
+            </p>
           ) : (
-            <ul className="flex flex-col gap-4">
+            <ul className="flex flex-col gap-3">
               {assets.map((asset) => (
-                <li key={asset.id} className="flex flex-col gap-2 border-t border-zinc-800 pt-3">
+                <Card key={asset.id} className="gap-3">
                   <div className="flex items-center gap-3 text-sm">
-                    <span className="font-medium">
+                    <span className="font-medium capitalize text-fg">
                       {asset.type} v{asset.version}
                     </span>
-                    <span
-                      className={
-                        asset.status === "approved"
-                          ? "text-green-400"
-                          : asset.status === "draft"
-                            ? "text-yellow-400"
-                            : "text-zinc-500"
-                      }
-                    >
-                      {asset.status}
-                    </span>
+                    <Badge variant={ASSET_BADGE[asset.status]}>{asset.status}</Badge>
                   </div>
 
                   {asset.previewUrl && asset.type === "video" ? (
-                    <video src={asset.previewUrl} controls className="max-w-sm rounded-md" />
+                    <video src={asset.previewUrl} controls className="max-w-sm rounded-md border border-border" />
                   ) : asset.previewUrl ? (
-                    <img src={asset.previewUrl} alt="" className="max-w-sm rounded-md" />
+                    <img src={asset.previewUrl} alt="" className="max-w-sm rounded-md border border-border" />
                   ) : null}
 
                   <div className="flex gap-2">
@@ -172,7 +171,7 @@ export function MediaManager({
                       </Button>
                     )}
                   </div>
-                </li>
+                </Card>
               ))}
             </ul>
           )}

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Checkbox, Input, Select, Textarea } from "@mogd/ui";
+import { Button, Card, Checkbox, Input, Select, Textarea } from "@mogd/ui";
 import { exercises, physique } from "@mogd/domain";
 import { createExerciseAction, updateExerciseAction } from "./actions";
 
@@ -108,168 +108,165 @@ export function ExerciseForm({
   }
 
   return (
-    <div className="flex max-w-lg flex-col gap-4">
-      {exerciseId ? (
-        <p className="text-sm text-zinc-500">
-          canonicalId: <span className="text-zinc-300">{form.canonicalId}</span> (immutable)
-        </p>
-      ) : (
-        <Input
-          placeholder="canonicalId (e.g. incline_dumbbell_press)"
-          value={form.canonicalId}
-          onChange={(e) => set("canonicalId", e.target.value)}
+    <div className="flex max-w-2xl flex-col gap-4">
+      <Card title="Identity">
+        {exerciseId ? (
+          <p className="text-sm text-fg-secondary">
+            canonicalId: <span className="font-mono text-fg-secondary-alt">{form.canonicalId}</span> (immutable)
+          </p>
+        ) : (
+          <Input
+            placeholder="canonicalId (e.g. incline_dumbbell_press)"
+            value={form.canonicalId}
+            onChange={(e) => set("canonicalId", e.target.value)}
+          />
+        )}
+
+        <Input placeholder="Name" value={form.name} onChange={(e) => set("name", e.target.value)} />
+
+        <Checkbox
+          id="isActive"
+          label="Active (resolvable by generated plans)"
+          checked={form.isActive}
+          onChange={(e) => set("isActive", e.target.checked)}
         />
-      )}
+      </Card>
 
-      <Input
-        placeholder="Name"
-        value={form.name}
-        onChange={(e) => set("name", e.target.value)}
-      />
+      <Card title="Classification">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Select value={form.movementPattern} onChange={(e) => set("movementPattern", e.target.value)}>
+            <option value="" disabled>
+              Movement pattern
+            </option>
+            {MOVEMENT_PATTERN_OPTIONS.map((o) => (
+              <option key={o} value={o}>
+                {label(o)}
+              </option>
+            ))}
+          </Select>
 
-      <Select
-        value={form.movementPattern}
-        onChange={(e) => set("movementPattern", e.target.value)}
-      >
-        <option value="" disabled>
-          Movement pattern
-        </option>
-        {MOVEMENT_PATTERN_OPTIONS.map((o) => (
-          <option key={o} value={o}>
-            {label(o)}
-          </option>
-        ))}
-      </Select>
-
-      <Select value={form.difficulty} onChange={(e) => set("difficulty", e.target.value)}>
-        <option value="" disabled>
-          Difficulty
-        </option>
-        {EXERCISE_DIFFICULTY_OPTIONS.map((o) => (
-          <option key={o} value={o}>
-            {label(o)}
-          </option>
-        ))}
-      </Select>
-
-      <div>
-        <p className="mb-1 text-sm text-zinc-500">Primary muscles</p>
-        <div className="grid grid-cols-2 gap-1">
-          {CANONICAL_MUSCLE_GROUPS.map((m) => (
-            <Checkbox
-              key={m}
-              id={`primary-${m}`}
-              label={label(m)}
-              checked={form.primaryMuscles.includes(m)}
-              onChange={() => toggleMuscle("primaryMuscles", m)}
-            />
-          ))}
+          <Select value={form.difficulty} onChange={(e) => set("difficulty", e.target.value)}>
+            <option value="" disabled>
+              Difficulty
+            </option>
+            {EXERCISE_DIFFICULTY_OPTIONS.map((o) => (
+              <option key={o} value={o}>
+                {label(o)}
+              </option>
+            ))}
+          </Select>
         </div>
-      </div>
 
-      <div>
-        <p className="mb-1 text-sm text-zinc-500">Secondary muscles</p>
-        <div className="grid grid-cols-2 gap-1">
-          {CANONICAL_MUSCLE_GROUPS.map((m) => (
-            <Checkbox
-              key={m}
-              id={`secondary-${m}`}
-              label={label(m)}
-              checked={form.secondaryMuscles.includes(m)}
-              onChange={() => toggleMuscle("secondaryMuscles", m)}
-            />
-          ))}
+        <div>
+          <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-fg-secondary">
+            Primary muscles
+          </p>
+          <div className="grid grid-cols-2 gap-1 sm:grid-cols-3">
+            {CANONICAL_MUSCLE_GROUPS.map((m) => (
+              <Checkbox
+                key={m}
+                id={`primary-${m}`}
+                label={label(m)}
+                checked={form.primaryMuscles.includes(m)}
+                onChange={() => toggleMuscle("primaryMuscles", m)}
+              />
+            ))}
+          </div>
         </div>
-      </div>
 
-      <div>
-        <p className="mb-1 text-sm text-zinc-500">Equipment</p>
-        <div className="grid grid-cols-2 gap-1">
-          {EQUIPMENT_OPTIONS.map((eq) => (
-            <Checkbox
-              key={eq}
-              id={`equipment-${eq}`}
-              label={label(eq)}
-              checked={form.equipment.includes(eq)}
-              onChange={() => toggleEquipment(eq)}
-            />
-          ))}
+        <div>
+          <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-fg-secondary">
+            Secondary muscles
+          </p>
+          <div className="grid grid-cols-2 gap-1 sm:grid-cols-3">
+            {CANONICAL_MUSCLE_GROUPS.map((m) => (
+              <Checkbox
+                key={m}
+                id={`secondary-${m}`}
+                label={label(m)}
+                checked={form.secondaryMuscles.includes(m)}
+                onChange={() => toggleMuscle("secondaryMuscles", m)}
+              />
+            ))}
+          </div>
         </div>
-      </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <Input
-          type="number"
-          placeholder="Hypertrophy score (0-10)"
-          value={form.hypertrophyScore ?? ""}
-          onChange={(e) =>
-            set("hypertrophyScore", e.target.value ? Number(e.target.value) : undefined)
-          }
-        />
-        <Input
-          type="number"
-          placeholder="Strength score (0-10)"
-          value={form.strengthScore ?? ""}
-          onChange={(e) =>
-            set("strengthScore", e.target.value ? Number(e.target.value) : undefined)
-          }
-        />
-        <Input
-          type="number"
-          placeholder="Fatigue score (0-10)"
-          value={form.fatigueScore ?? ""}
-          onChange={(e) =>
-            set("fatigueScore", e.target.value ? Number(e.target.value) : undefined)
-          }
-        />
-        <Input
-          type="number"
-          placeholder="Stability demand (0-10)"
-          value={form.stabilityDemand ?? ""}
-          onChange={(e) =>
-            set("stabilityDemand", e.target.value ? Number(e.target.value) : undefined)
-          }
-        />
-        <Input
-          type="number"
-          placeholder="Default rep min"
-          value={form.defaultRepMin ?? ""}
-          onChange={(e) =>
-            set("defaultRepMin", e.target.value ? Number(e.target.value) : undefined)
-          }
-        />
-        <Input
-          type="number"
-          placeholder="Default rep max"
-          value={form.defaultRepMax ?? ""}
-          onChange={(e) =>
-            set("defaultRepMax", e.target.value ? Number(e.target.value) : undefined)
-          }
-        />
-      </div>
+        <div>
+          <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-fg-secondary">Equipment</p>
+          <div className="grid grid-cols-2 gap-1 sm:grid-cols-3">
+            {EQUIPMENT_OPTIONS.map((eq) => (
+              <Checkbox
+                key={eq}
+                id={`equipment-${eq}`}
+                label={label(eq)}
+                checked={form.equipment.includes(eq)}
+                onChange={() => toggleEquipment(eq)}
+              />
+            ))}
+          </div>
+        </div>
+      </Card>
 
-      <Input
-        placeholder="Contraindication tags, comma separated (e.g. knee_pain, shoulder_impingement)"
-        value={tagsText}
-        onChange={(e) => setTagsText(e.target.value)}
-      />
+      <Card title="Programming">
+        <div className="grid grid-cols-2 gap-3">
+          <Input
+            type="number"
+            placeholder="Hypertrophy score (0-10)"
+            value={form.hypertrophyScore ?? ""}
+            onChange={(e) => set("hypertrophyScore", e.target.value ? Number(e.target.value) : undefined)}
+          />
+          <Input
+            type="number"
+            placeholder="Strength score (0-10)"
+            value={form.strengthScore ?? ""}
+            onChange={(e) => set("strengthScore", e.target.value ? Number(e.target.value) : undefined)}
+          />
+          <Input
+            type="number"
+            placeholder="Fatigue score (0-10)"
+            value={form.fatigueScore ?? ""}
+            onChange={(e) => set("fatigueScore", e.target.value ? Number(e.target.value) : undefined)}
+          />
+          <Input
+            type="number"
+            placeholder="Stability demand (0-10)"
+            value={form.stabilityDemand ?? ""}
+            onChange={(e) => set("stabilityDemand", e.target.value ? Number(e.target.value) : undefined)}
+          />
+          <Input
+            type="number"
+            placeholder="Default rep min"
+            value={form.defaultRepMin ?? ""}
+            onChange={(e) => set("defaultRepMin", e.target.value ? Number(e.target.value) : undefined)}
+          />
+          <Input
+            type="number"
+            placeholder="Default rep max"
+            value={form.defaultRepMax ?? ""}
+            onChange={(e) => set("defaultRepMax", e.target.value ? Number(e.target.value) : undefined)}
+          />
+        </div>
+      </Card>
 
-      <Textarea
-        placeholder="Instructions (optional)"
-        value={form.instructions ?? ""}
-        onChange={(e) => set("instructions", e.target.value)}
-      />
+      <Card title="Safety">
+        <Input
+          placeholder="Contraindication tags, comma separated (e.g. knee_pain, shoulder_impingement)"
+          value={tagsText}
+          onChange={(e) => setTagsText(e.target.value)}
+        />
+      </Card>
 
-      <Checkbox
-        id="isActive"
-        label="Active (resolvable by generated plans)"
-        checked={form.isActive}
-        onChange={(e) => set("isActive", e.target.checked)}
-      />
+      <Card title="Instructions">
+        <Textarea
+          placeholder="Instructions (optional)"
+          value={form.instructions ?? ""}
+          onChange={(e) => set("instructions", e.target.value)}
+        />
+      </Card>
 
-      {error && <p className="text-sm text-red-400">{error}</p>}
+      {error && <p className="text-sm text-status-warning">{error}</p>}
 
-      <Button onClick={save} disabled={saving}>
+      <Button onClick={save} disabled={saving} className="self-start">
         {saving ? "Saving…" : exerciseId ? "Save changes" : "Create exercise"}
       </Button>
     </div>

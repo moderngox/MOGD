@@ -1,6 +1,8 @@
+import Link from "next/link";
 import { count, eq, or, desc } from "drizzle-orm";
 import { getDb, schema } from "@mogd/db";
 import { exercises } from "@mogd/domain";
+import { BigStat, Card } from "@mogd/ui";
 
 export default async function AdminDashboardPage() {
   const db = getDb();
@@ -22,45 +24,55 @@ export default async function AdminDashboardPage() {
   ]);
 
   return (
-    <div className="flex flex-col gap-4">
-      <h1 className="text-2xl font-semibold">Dashboard</h1>
+    <div className="flex flex-col gap-5">
+      <h1 className="font-display text-3xl font-semibold text-fg">Dashboard</h1>
 
-      <dl className="grid max-w-sm grid-cols-2 gap-x-4 gap-y-2 text-sm">
-        <dt className="text-zinc-500">Users</dt>
-        <dd className="text-zinc-100">{userCount!.value}</dd>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <Card title="People">
+          <div className="grid grid-cols-2 gap-4">
+            <BigStat label="Users" value={userCount!.value} />
+            <BigStat label="Active programs" value={programCount!.value} />
+          </div>
+        </Card>
 
-        <dt className="text-zinc-500">Active programs</dt>
-        <dd className="text-zinc-100">{programCount!.value}</dd>
+        <Card title="Exercise catalog" eyebrow={<Link href="/exercises" className="hover:text-accent">View all →</Link>}>
+          <div className="grid grid-cols-2 gap-4">
+            <BigStat label="Total" value={stats.totalExercises} />
+            <BigStat label="Active" value={stats.activeExercises} />
+          </div>
+          <div className="flex items-baseline justify-between border-t border-border pt-3">
+            <span className="text-sm text-fg-secondary-alt">Missing published video</span>
+            <span
+              className={`text-sm font-semibold tabular-nums ${
+                stats.missingVideoCount > 0 ? "text-status-caution" : "text-fg"
+              }`}
+            >
+              {stats.missingVideoCount}
+            </span>
+          </div>
+        </Card>
 
-        <dt className="text-zinc-500">Exercises</dt>
-        <dd className="text-zinc-100">{stats.totalExercises}</dd>
-
-        <dt className="text-zinc-500">Active</dt>
-        <dd className="text-zinc-100">{stats.activeExercises}</dd>
-
-        <dt className="text-zinc-500">Missing published video</dt>
-        <dd className={stats.missingVideoCount > 0 ? "text-yellow-400" : "text-zinc-100"}>
-          {stats.missingVideoCount}
-        </dd>
-
-        <dt className="text-zinc-500">AI failures</dt>
-        <dd className={aiFailureCount!.value > 0 ? "text-yellow-400" : "text-zinc-100"}>
-          {aiFailureCount!.value}
-        </dd>
-      </dl>
+        <Card title="AI health" eyebrow={<Link href="/ai-runs" className="hover:text-accent">View all →</Link>}>
+          <BigStat label="Rejected / errored runs" value={aiFailureCount!.value} />
+        </Card>
+      </div>
 
       {recentFailures.length > 0 && (
-        <div className="flex flex-col gap-2">
-          <h2 className="text-lg font-medium">Recent AI failures</h2>
-          <ul className="text-sm text-zinc-400">
+        <Card title="Recent AI failures">
+          <ul className="flex flex-col divide-y divide-border">
             {recentFailures.map((run) => (
-              <li key={run.id}>
-                {new Date(run.createdAt).toISOString()} · {run.purpose} · {run.validationStatus}
-                {run.errorClassification ? ` (${run.errorClassification})` : ""}
+              <li key={run.id} className="flex items-center justify-between gap-3 py-2 text-sm">
+                <span className="text-fg">
+                  {run.purpose} <span className="text-fg-secondary">· {run.validationStatus}</span>
+                  {run.errorClassification ? (
+                    <span className="text-fg-secondary"> ({run.errorClassification})</span>
+                  ) : null}
+                </span>
+                <span className="shrink-0 text-fg-muted">{new Date(run.createdAt).toISOString()}</span>
               </li>
             ))}
           </ul>
-        </div>
+        </Card>
       )}
     </div>
   );
