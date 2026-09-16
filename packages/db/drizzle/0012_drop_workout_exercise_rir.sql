@@ -1,0 +1,1 @@
+ALTER TABLE `workout_exercise` DROP COLUMN `rir`;

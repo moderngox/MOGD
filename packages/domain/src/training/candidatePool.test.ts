@@ -1,8 +1,22 @@
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
+import { eq } from "drizzle-orm";
 import { createTestDatabase } from "@mogd/db/testUtils";
-import { type Database } from "@mogd/db";
+import { schema, type Database } from "@mogd/db";
 import { createExercise } from "../exercises/exerciseCatalog";
+import { upsertProgrammingProfile } from "../exercises/programmingProfiles";
 import { getExerciseCandidates } from "./candidatePool";
+
+const DISABLED_PROFILE_INPUT = {
+  enabled: false,
+  setsMin: 2,
+  setsMax: 4,
+  repsMin: 6,
+  repsMax: 10,
+  rirMin: 1,
+  rirMax: 3,
+  restSecondsMin: 75,
+  restSecondsMax: 120,
+} as const;
 
 describe("getExerciseCandidates", () => {
   let db: Database;
@@ -97,5 +111,50 @@ describe("getExerciseCandidates", () => {
       equipment: ["dumbbells"],
     });
     expect(candidates.map((c) => c.canonicalId)).toContain("incline_dumbbell_press");
+  });
+
+  it("attaches the resolved programming profile for the requested level", async () => {
+    const [candidate] = await getExerciseCandidates(db, {
+      sessionLabel: "push",
+      experienceLevel: "intermediate",
+      equipment: ["dumbbells"],
+    });
+    expect(candidate?.programmingProfile.traineeLevel).toBe("intermediate");
+  });
+
+  it("falls back to the nearest enabled level when the exact level's profile is disabled", async () => {
+    const rows = await db
+      .select({ id: schema.exercises.id })
+      .from(schema.exercises)
+      .where(eq(schema.exercises.canonicalId, "incline_dumbbell_press"));
+    const id = rows[0]!.id;
+
+    await upsertProgrammingProfile(db, id, "intermediate", DISABLED_PROFILE_INPUT);
+
+    const [candidate] = await getExerciseCandidates(db, {
+      sessionLabel: "push",
+      experienceLevel: "intermediate",
+      equipment: ["dumbbells"],
+    });
+    expect(candidate?.programmingProfile.traineeLevel).toBe("beginner");
+  });
+
+  it("excludes an exercise entirely when every level's profile is disabled", async () => {
+    const rows = await db
+      .select({ id: schema.exercises.id })
+      .from(schema.exercises)
+      .where(eq(schema.exercises.canonicalId, "incline_dumbbell_press"));
+    const id = rows[0]!.id;
+
+    for (const level of ["beginner", "intermediate", "advanced"] as const) {
+      await upsertProgrammingProfile(db, id, level, DISABLED_PROFILE_INPUT);
+    }
+
+    const candidates = await getExerciseCandidates(db, {
+      sessionLabel: "push",
+      experienceLevel: "intermediate",
+      equipment: ["dumbbells"],
+    });
+    expect(candidates.some((c) => c.canonicalId === "incline_dumbbell_press")).toBe(false);
   });
 });

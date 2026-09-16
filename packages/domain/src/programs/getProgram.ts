@@ -15,7 +15,8 @@ export interface ProgramWorkoutExerciseView {
   sets: number;
   repMin: number;
   repMax: number;
-  rir: number;
+  rirMin: number;
+  rirMax: number;
   restSeconds: number;
   /** Null for workouts generated before this field existed (see schema). */
   sessionRole: SessionRole | null;
@@ -61,7 +62,8 @@ export async function getCurrentProgram(db: Database, userId: string): Promise<P
         sets: schema.workoutExercises.sets,
         repMin: schema.workoutExercises.repMin,
         repMax: schema.workoutExercises.repMax,
-        rir: schema.workoutExercises.rir,
+        rirMin: schema.workoutExercises.rirMin,
+        rirMax: schema.workoutExercises.rirMax,
         restSeconds: schema.workoutExercises.restSeconds,
         sessionRole: schema.workoutExercises.sessionRole,
         canonicalId: schema.exercises.canonicalId,
@@ -131,7 +133,8 @@ export async function getWorkout(db: Database, workoutId: string): Promise<Progr
       sets: schema.workoutExercises.sets,
       repMin: schema.workoutExercises.repMin,
       repMax: schema.workoutExercises.repMax,
-      rir: schema.workoutExercises.rir,
+      rirMin: schema.workoutExercises.rirMin,
+      rirMax: schema.workoutExercises.rirMax,
       restSeconds: schema.workoutExercises.restSeconds,
       sessionRole: schema.workoutExercises.sessionRole,
       canonicalId: schema.exercises.canonicalId,

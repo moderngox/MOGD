@@ -11,6 +11,8 @@ export async function logSetAction(input: {
   loadKg?: number;
   reps: number;
   rir?: number;
+  painFlag?: boolean;
+  techniqueValid?: boolean;
 }) {
   const session = await auth();
   if (!session?.user?.id) {

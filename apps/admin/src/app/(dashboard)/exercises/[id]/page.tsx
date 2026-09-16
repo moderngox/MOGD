@@ -5,6 +5,7 @@ import { exercises } from "@mogd/domain";
 import { Badge, Button } from "@mogd/ui";
 import { ExerciseForm } from "../ExerciseForm";
 import { RelationshipsSection } from "./RelationshipsSection";
+import { ProgrammingProfilesSection } from "./ProgrammingProfilesSection";
 
 export default async function EditExercisePage({
   params,
@@ -16,9 +17,10 @@ export default async function EditExercisePage({
   const exercise = await exercises.getExerciseById(db, id);
   if (!exercise) notFound();
 
-  const [relationships, allExercises] = await Promise.all([
+  const [relationships, allExercises, programmingProfiles] = await Promise.all([
     exercises.getExerciseRelationships(db, id),
     exercises.listExercises(db),
+    exercises.listProgrammingProfiles(db, id),
   ]);
 
   return (
@@ -48,8 +50,6 @@ export default async function EditExercisePage({
           strengthScore: exercise.strengthScore ?? undefined,
           fatigueScore: exercise.fatigueScore ?? undefined,
           stabilityDemand: exercise.stabilityDemand ?? undefined,
-          defaultRepMin: exercise.defaultRepMin ?? undefined,
-          defaultRepMax: exercise.defaultRepMax ?? undefined,
           contraindicationTags: exercise.contraindicationTags,
           instructions: exercise.instructions ?? undefined,
           isActive: exercise.isActive,
@@ -57,6 +57,7 @@ export default async function EditExercisePage({
           preferredSessionRole: exercise.preferredSessionRole ?? undefined,
         }}
       />
+      <ProgrammingProfilesSection exerciseId={exercise.id} profiles={programmingProfiles} />
       <RelationshipsSection
         exerciseId={exercise.id}
         relationships={relationships}

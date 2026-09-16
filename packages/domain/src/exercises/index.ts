@@ -23,6 +23,16 @@ export {
 } from "./assetService";
 export { getCatalogStats, type CatalogStats } from "./catalogStats";
 export {
+  createDefaultProgrammingProfiles,
+  listProgrammingProfiles,
+  listProgrammingProfilesForExercises,
+  resolveApplicableProfile,
+  upsertProgrammingProfile,
+  upsertProgrammingProfileInput,
+  type ProgrammingProfile,
+  type UpsertProgrammingProfileInput,
+} from "./programmingProfiles";
+export {
   createExerciseRelationship,
   deleteRelationship,
   getExerciseRelationships,

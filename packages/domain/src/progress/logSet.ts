@@ -8,6 +8,10 @@ export const logSetInput = z.object({
   loadKg: z.coerce.number().min(0).max(500).optional(),
   reps: z.coerce.number().int().min(0).max(100),
   rir: z.coerce.number().int().min(0).max(10).optional(),
+  // Optional signals (mogd_programming_engine_specs 03) that gate the
+  // progression engine — see packages/domain/src/training/progression.ts.
+  painFlag: z.coerce.boolean().optional(),
+  techniqueValid: z.coerce.boolean().optional(),
 });
 export type LogSetInput = z.infer<typeof logSetInput>;
 
@@ -31,6 +35,8 @@ export async function logWorkoutSet(db: Database, userId: string, rawInput: LogS
       loadKg: input.loadKg,
       reps: input.reps,
       rir: input.rir,
+      painFlag: input.painFlag,
+      techniqueValid: input.techniqueValid,
     })
     .returning();
   return log;

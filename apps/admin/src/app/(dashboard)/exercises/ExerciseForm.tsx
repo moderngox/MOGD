@@ -26,8 +26,6 @@ export interface ExerciseFormValue {
   strengthScore?: number;
   fatigueScore?: number;
   stabilityDemand?: number;
-  defaultRepMin?: number;
-  defaultRepMax?: number;
   contraindicationTags: string[];
   instructions?: string;
   isActive: boolean;
@@ -257,18 +255,6 @@ export function ExerciseForm({
             placeholder="Stability demand (0-10)"
             value={form.stabilityDemand ?? ""}
             onChange={(e) => set("stabilityDemand", e.target.value ? Number(e.target.value) : undefined)}
-          />
-          <Input
-            type="number"
-            placeholder="Default rep min"
-            value={form.defaultRepMin ?? ""}
-            onChange={(e) => set("defaultRepMin", e.target.value ? Number(e.target.value) : undefined)}
-          />
-          <Input
-            type="number"
-            placeholder="Default rep max"
-            value={form.defaultRepMax ?? ""}
-            onChange={(e) => set("defaultRepMax", e.target.value ? Number(e.target.value) : undefined)}
           />
         </div>
       </Card>

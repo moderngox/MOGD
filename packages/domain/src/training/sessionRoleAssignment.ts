@@ -123,7 +123,8 @@ interface Prescription {
   sets: number;
   repMin: number;
   repMax: number;
-  rir: number;
+  rirMin: number;
+  rirMax: number;
   restSeconds: number;
 }
 
@@ -157,12 +158,17 @@ export function applyRoleModifier(
     if (repMin > repMax) repMin = repMax;
   }
 
-  const rir = modifier.rirCeiling !== undefined ? Math.min(baseline.rir, modifier.rirCeiling) : baseline.rir;
+  let rirMax = baseline.rirMax;
+  let rirMin = baseline.rirMin;
+  if (modifier.rirCeiling !== undefined) {
+    rirMax = Math.min(rirMax, modifier.rirCeiling);
+    rirMin = Math.min(rirMin, rirMax);
+  }
 
   let sets = baseline.sets;
   if (modifier.setsDelta) {
     sets = Math.min(setsBounds.max, Math.max(setsBounds.min, sets + modifier.setsDelta));
   }
 
-  return { sets, repMin, repMax, rir, restSeconds };
+  return { sets, repMin, repMax, rirMin, rirMax, restSeconds };
 }

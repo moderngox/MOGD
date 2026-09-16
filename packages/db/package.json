@@ -16,7 +16,8 @@
     "lint": "eslint src",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/migrate.ts",
-    "db:promote-admin": "tsx src/promoteAdmin.ts"
+    "db:promote-admin": "tsx src/promoteAdmin.ts",
+    "db:backfill-programming-profiles": "tsx src/backfillProgrammingProfiles.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.14.0",

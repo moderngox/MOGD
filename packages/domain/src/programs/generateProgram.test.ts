@@ -158,9 +158,9 @@ describe("generateProgram", () => {
 
     const workoutExercises = await db.select().from(schema.workoutExercises);
     for (const we of workoutExercises) {
-      expect(we.sets).toBeGreaterThanOrEqual(2);
-      expect(we.sets).toBeLessThanOrEqual(5);
       expect(SESSION_ROLE_OPTIONS).toContain(we.sessionRole);
+      expect(we.rirMin).toBeLessThanOrEqual(we.rirMax);
+      expect(we.repMin).toBeLessThanOrEqual(we.repMax);
     }
   });
 

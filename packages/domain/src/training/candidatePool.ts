@@ -2,6 +2,8 @@ import { eq } from "drizzle-orm";
 import { schema, type Database } from "@mogd/db";
 import type { ExperienceLevel, Equipment } from "../assessment/options";
 import type { ExerciseDifficulty } from "../exercises/options";
+import type { ProgrammingProfile } from "../exercises/programmingProfiles";
+import { listProgrammingProfilesForExercises, resolveApplicableProfile } from "../exercises/programmingProfiles";
 import type { CanonicalMuscleGroup } from "../physique/muscles";
 import type { SessionLabel } from "./splitTemplates";
 import { SESSION_MUSCLE_MAP } from "./splitTemplates";
@@ -20,13 +22,24 @@ const ALLOWED_DIFFICULTY: Record<ExperienceLevel, ExerciseDifficulty[]> = {
 
 export type CatalogExercise = typeof schema.exercises.$inferSelect;
 
+export interface EligibleExercise extends CatalogExercise {
+  /** The profile allocateSession must prescribe from — resolved here (with
+   * cross-level fallback, see resolveApplicableProfile) so this is the one
+   * place "can this exercise be prescribed to this user at all" is decided. */
+  programmingProfile: ProgrammingProfile;
+}
+
 /**
  * Hard eligibility filter for one session (docs/ARCHITECTURE.md §10's
  * ExerciseCandidatePool step): active, equipment the user actually has,
- * difficulty within their experience ceiling, and at least one primary or
- * secondary muscle in common with what this session trains. Note: this
- * does NOT check the user's free-text injury/limitation notes against
- * exercise contraindication tags — there is no reviewed structured
+ * difficulty within their experience ceiling, at least one primary or
+ * secondary muscle in common with what this session trains, and a
+ * resolvable trainee-level programming profile (mogd_programming_engine_specs
+ * 04: "no history" prescribes reps/RIR only, but *something* must define
+ * that rep/RIR range — an exercise with every profile disabled has nothing
+ * to prescribe and is excluded, same as failing any other hard gate).
+ * Note: this does NOT check the user's free-text injury/limitation notes
+ * against exercise contraindication tags — there is no reviewed structured
  * taxonomy connecting the two (see docs/domain/safety's eligibility.ts for
  * the same honesty principle: don't fabricate a matching heuristic that
  * looks safe but isn't backed by real structured data).
@@ -38,7 +51,7 @@ export async function getExerciseCandidates(
     experienceLevel: ExperienceLevel;
     equipment: Equipment[];
   },
-): Promise<CatalogExercise[]> {
+): Promise<EligibleExercise[]> {
   const allActive = await db
     .select()
     .from(schema.exercises)
@@ -48,7 +61,7 @@ export async function getExerciseCandidates(
   const userEquipment = new Set<string>(input.equipment);
   const sessionMuscles = new Set<CanonicalMuscleGroup>(SESSION_MUSCLE_MAP[input.sessionLabel]);
 
-  return allActive.filter((exercise) => {
+  const gated = allActive.filter((exercise) => {
     if (!allowedDifficulty.has(exercise.difficulty as ExerciseDifficulty)) return false;
 
     const equipmentOk =
@@ -61,4 +74,13 @@ export async function getExerciseCandidates(
       exercise.secondaryMuscles.some((m) => sessionMuscles.has(m as CanonicalMuscleGroup));
     return musclesOk;
   });
+
+  const profilesByExercise = await listProgrammingProfilesForExercises(db, gated.map((e) => e.id));
+
+  const eligible: EligibleExercise[] = [];
+  for (const exercise of gated) {
+    const profile = resolveApplicableProfile(profilesByExercise.get(exercise.id) ?? [], input.experienceLevel);
+    if (profile) eligible.push({ ...exercise, programmingProfile: profile });
+  }
+  return eligible;
 }

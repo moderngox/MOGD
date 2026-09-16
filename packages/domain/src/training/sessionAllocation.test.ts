@@ -1,12 +1,44 @@
 import { describe, expect, it } from "vitest";
 import { allocateSession } from "./sessionAllocation";
-import type { CatalogExercise } from "./candidatePool";
+import type { EligibleExercise } from "./candidatePool";
+import type { ProgrammingProfile } from "../exercises/programmingProfiles";
 import type { CanonicalMuscleGroup } from "../physique/muscles";
 import { SESSION_ROLE_OPTIONS } from "../exercises/options";
 
 let counter = 0;
-function mockExercise(overrides: Partial<CatalogExercise>): CatalogExercise {
+let profileCounter = 0;
+
+function mockProfile(overrides: Partial<ProgrammingProfile> = {}): ProgrammingProfile {
+  profileCounter += 1;
+  return {
+    id: `profile-${profileCounter}`,
+    exerciseId: "",
+    traineeLevel: "intermediate",
+    enabled: true,
+    isInheritedDefault: false,
+    setsMin: 2,
+    setsMax: 5,
+    repsMin: 6,
+    repsMax: 10,
+    rirMin: 1,
+    rirMax: 3,
+    restSecondsMin: 75,
+    restSecondsMax: 120,
+    prescriptionType: "rir",
+    progressionType: "double_progression",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...overrides,
+  };
+}
+
+function mockExercise(
+  overrides: Partial<Omit<EligibleExercise, "programmingProfile">> & {
+    programmingProfile?: Partial<ProgrammingProfile>;
+  } = {},
+): EligibleExercise {
   counter += 1;
+  const { programmingProfile, ...exerciseOverrides } = overrides;
   return {
     id: `id-${counter}`,
     canonicalId: `exercise_${counter}`,
@@ -20,8 +52,6 @@ function mockExercise(overrides: Partial<CatalogExercise>): CatalogExercise {
     strengthScore: null,
     fatigueScore: null,
     stabilityDemand: null,
-    defaultRepMin: null,
-    defaultRepMax: null,
     contraindicationTags: [],
     instructions: null,
     isActive: true,
@@ -31,7 +61,8 @@ function mockExercise(overrides: Partial<CatalogExercise>): CatalogExercise {
     preferredSessionRole: null,
     createdAt: new Date(),
     updatedAt: new Date(),
-    ...overrides,
+    programmingProfile: mockProfile(programmingProfile),
+    ...exerciseOverrides,
   };
 }
 
@@ -90,11 +121,10 @@ describe("allocateSession", () => {
     expect(result[0]?.canonicalId).toBe("lateral_raise");
   });
 
-  it("respects an exercise's own configured rep range over the goal-derived default", () => {
+  it("takes the rep range from the exercise's resolved programming profile", () => {
     const configured = mockExercise({
       primaryMuscles: ["upper_chest"] as CanonicalMuscleGroup[],
-      defaultRepMin: 6,
-      defaultRepMax: 8,
+      programmingProfile: { repsMin: 6, repsMax: 8 },
     });
 
     const result = allocateSession({
@@ -108,33 +138,30 @@ describe("allocateSession", () => {
     expect(result[0]).toMatchObject({ repMin: 6, repMax: 8 });
   });
 
-  it("falls back to a hypertrophy rep range when trainingBias favors hypertrophy", () => {
-    const unconfigured = mockExercise({ primaryMuscles: ["upper_chest"] as CanonicalMuscleGroup[] });
+  it("takes the RIR range from the resolved programming profile, independent of trainingBias", () => {
+    const configured = mockExercise({
+      primaryMuscles: ["upper_chest"] as CanonicalMuscleGroup[],
+      programmingProfile: { rirMin: 0, rirMax: 2 },
+    });
+
     const result = allocateSession({
       sessionLabel: "push",
-      candidates: [unconfigured],
+      candidates: [configured],
       weeklyVolumeTargets: { upper_chest: 14 } as Record<CanonicalMuscleGroup, number>,
-      trainingBias: { hypertrophy: 0.8, strength: 0.2 },
-      sessionDurationMinutes: 30,
-    });
-    expect(result[0]).toMatchObject({ repMin: 8, repMax: 12 });
-  });
-
-  it("falls back to a strength rep range when trainingBias favors strength", () => {
-    const unconfigured = mockExercise({ primaryMuscles: ["quadriceps"] as CanonicalMuscleGroup[] });
-    const result = allocateSession({
-      sessionLabel: "legs",
-      candidates: [unconfigured],
-      weeklyVolumeTargets: { quadriceps: 14 } as Record<CanonicalMuscleGroup, number>,
       trainingBias: { hypertrophy: 0.2, strength: 0.8 },
       sessionDurationMinutes: 30,
     });
-    expect(result[0]).toMatchObject({ repMin: 4, repMax: 6 });
+
+    expect(result[0]).toMatchObject({ rirMin: 0, rirMax: 2 });
   });
 
-  it("keeps sets within the configured min/max per exercise", () => {
+  it("keeps sets within the resolved profile's own min/max, not a global constant", () => {
     const candidates = Array.from({ length: 3 }, (_, i) =>
-      mockExercise({ canonicalId: `ex_${i}`, primaryMuscles: ["quadriceps"] as CanonicalMuscleGroup[] }),
+      mockExercise({
+        canonicalId: `ex_${i}`,
+        primaryMuscles: ["quadriceps"] as CanonicalMuscleGroup[],
+        programmingProfile: { setsMin: 3, setsMax: 4 },
+      }),
     );
     const result = allocateSession({
       sessionLabel: "legs",
@@ -144,8 +171,8 @@ describe("allocateSession", () => {
       sessionDurationMinutes: 120,
     });
     for (const allocated of result) {
-      expect(allocated.sets).toBeGreaterThanOrEqual(2);
-      expect(allocated.sets).toBeLessThanOrEqual(5);
+      expect(allocated.sets).toBeGreaterThanOrEqual(3);
+      expect(allocated.sets).toBeLessThanOrEqual(4);
     }
   });
 

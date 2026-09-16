@@ -74,3 +74,15 @@ export type RelationshipAction = (typeof RELATIONSHIP_ACTION_OPTIONS)[number];
  */
 export const SESSION_ROLE_OPTIONS = ["main", "accessory", "superset", "finisher"] as const;
 export type SessionRole = (typeof SESSION_ROLE_OPTIONS)[number];
+
+/**
+ * mogd_programming_engine_specs 01/02: "initially: rir" / "initially:
+ * double_progression" — only one value each is valid in v1. Real option
+ * lists (not a hardcoded literal) so the schema and admin UI are ready for a
+ * second value later without pretending one exists today.
+ */
+export const PRESCRIPTION_TYPE_OPTIONS = ["rir"] as const;
+export type PrescriptionType = (typeof PRESCRIPTION_TYPE_OPTIONS)[number];
+
+export const PROGRESSION_TYPE_OPTIONS = ["double_progression"] as const;
+export type ProgressionType = (typeof PROGRESSION_TYPE_OPTIONS)[number];

@@ -217,9 +217,6 @@ interface Exercise {
   fatigueScore?: number;
   stabilityDemand?: number;
 
-  defaultRepMin?: number;
-  defaultRepMax?: number;
-
   contraindicationTags: string[];
 
   instructions?: string;
@@ -231,7 +228,30 @@ interface Exercise {
 }
 ```
 
-Only add programming metadata that the engine genuinely uses.
+Only add programming metadata that the engine genuinely uses. Sets/reps/RIR/rest are deliberately not on the exercise itself — they live on a separate, trainee-level `ExerciseProgrammingProfile` (one row per exercise per beginner/intermediate/advanced), since exercise difficulty and trainee level are independent dimensions:
+
+```ts
+interface ExerciseProgrammingProfile {
+  id: string;
+  exerciseId: string;
+  traineeLevel: "beginner" | "intermediate" | "advanced";
+  enabled: boolean;
+
+  setsMin: number;
+  setsMax: number;
+  repsMin: number;
+  repsMax: number;
+  rirMin: number;
+  rirMax: number;
+  restSecondsMin: number;
+  restSecondsMax: number;
+
+  prescriptionType: "rir";
+  progressionType: "double_progression";
+}
+```
+
+A generated `WorkoutExercise` row resolves the applicable profile for the user's level, applies a session-role modifier (main/accessory/superset/finisher) on top, and persists the resulting sets/reps/RIR-range/rest directly on the row as a snapshot — never a universal fixed prescription, and never regenerated retroactively when admin later edits a profile.
 
 ---
 
@@ -395,10 +415,12 @@ Persist:
 - load
 - reps
 - RIR when collected
+- pain flag when collected
+- technique-valid flag when collected
 - completion
 - timestamp
 
-Previous exercise performance should be available to future sessions.
+Previous exercise performance should be available to future sessions. Progression evaluates every set logged in the most recent session, not just the latest set — a rep ceiling reached at RIR 0 is not the same signal as reaching it within the prescribed RIR range, and a pain or invalid-technique flag on any set blocks an automatic load increase regardless of reps achieved.
 
 ---
 
@@ -410,16 +432,16 @@ Example:
 
 ```text
 Previous:
-30 kg × 10
+30 kg × 10 · RIR 2 (target: RIR 1-3)
 
 Target:
 30 kg × 11–12
 
-Once rep ceiling is consistently reached:
-increase load
+Once every set reaches the rep ceiling within the target RIR range:
+increase load, restart the rep range
 ```
 
-Exact progression systems may vary by exercise/program.
+Exact progression systems may vary by exercise/program. Recommendations carry a machine-readable reason (e.g. `INCREASE_LOAD`, `HOLD_FOR_TECHNIQUE`, `REASSESS_DUE_TO_PAIN`) so the UI can explain why a target was produced and the engine stays debuggable — see `packages/domain/src/training/progression.ts`.
 
 Do not ask the LLM to rediscover progression rules during every workout.
 

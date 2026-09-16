@@ -71,6 +71,7 @@ export async function generateProgram(db: Database, userId: string): Promise<Gen
     sessionsPerWeek: training.sessionsPerWeek,
     sessionDurationMinutes: training.sessionDurationMinutes,
     equipment,
+    experienceLevel,
     workouts,
   };
 
@@ -127,7 +128,8 @@ export async function generateProgram(db: Database, userId: string): Promise<Gen
           sets: exercise.sets,
           repMin: exercise.repMin,
           repMax: exercise.repMax,
-          rir: exercise.rir,
+          rirMin: exercise.rirMin,
+          rirMax: exercise.rirMax,
           restSeconds: exercise.restSeconds,
           sessionRole: exercise.sessionRole,
           roleReason: exercise.roleReason,

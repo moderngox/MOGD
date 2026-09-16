@@ -2,6 +2,7 @@ import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import { createTestDatabase } from "@mogd/db/testUtils";
 import { type Database } from "@mogd/db";
 import { createExercise } from "../exercises/exerciseCatalog";
+import { upsertProgrammingProfile } from "../exercises/programmingProfiles";
 import { validateProgram, type ProgramPlan } from "./validator";
 
 describe("validateProgram", () => {
@@ -41,6 +42,7 @@ describe("validateProgram", () => {
       // duration tolerance band by default.
       sessionDurationMinutes: 15,
       equipment: ["dumbbells"],
+      experienceLevel: "intermediate",
       workouts: [
         {
           dayIndex: 0,
@@ -53,7 +55,8 @@ describe("validateProgram", () => {
               sets: 3,
               repMin: 8,
               repMax: 12,
-              rir: 2,
+              rirMin: 1,
+              rirMax: 3,
               restSeconds: 90,
               sessionRole: "main",
               roleReason: "STRONGEST_MAIN_CANDIDATE",
@@ -115,5 +118,26 @@ describe("validateProgram", () => {
     const result = await validateProgram(db, plan);
     expect(result.valid).toBe(false);
     expect(result.reasons.some((r) => r.includes("bounds"))).toBe(true);
+  });
+
+  it("rejects an exercise with no enabled programming profile for the plan's experience level", async () => {
+    const disabled = {
+      enabled: false,
+      setsMin: 2,
+      setsMax: 4,
+      repsMin: 6,
+      repsMax: 10,
+      rirMin: 1,
+      rirMax: 3,
+      restSecondsMin: 75,
+      restSecondsMax: 120,
+    } as const;
+    for (const level of ["beginner", "intermediate", "advanced"] as const) {
+      await upsertProgrammingProfile(db, exerciseId, level, disabled);
+    }
+
+    const result = await validateProgram(db, basePlan());
+    expect(result.valid).toBe(false);
+    expect(result.reasons.some((r) => r.includes("no enabled programming profile"))).toBe(true);
   });
 });

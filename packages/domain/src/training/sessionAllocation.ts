@@ -3,7 +3,7 @@ import type { TrainingBias } from "../physique/goalStrategy";
 import type { SessionRole } from "../exercises/options";
 import type { SessionLabel } from "./splitTemplates";
 import { SESSION_MUSCLE_MAP } from "./splitTemplates";
-import type { CatalogExercise } from "./candidatePool";
+import type { EligibleExercise } from "./candidatePool";
 import { assignSessionRoles, applyRoleModifier } from "./sessionRoleAssignment";
 import type { RoleReason } from "./sessionRoleAssignment";
 
@@ -14,7 +14,8 @@ export interface AllocatedExercise {
   sets: number;
   repMin: number;
   repMax: number;
-  rir: number;
+  rirMin: number;
+  rirMax: number;
   restSeconds: number;
   /** Engine-assigned per docs/MOGD_06-session-role-architecture.md — never a
    * property of the canonical exercise (see exercises.allowedSessionRoles/
@@ -49,16 +50,6 @@ function exerciseCountForDuration(minutes: number): number {
  * duration estimate rather than trusting whatever this module produced. */
 export const MINUTES_PER_SET = 4;
 
-export const MIN_SETS_PER_EXERCISE = 2;
-export const MAX_SETS_PER_EXERCISE = 5;
-
-const HYPERTROPHY_REP_RANGE = { min: 8, max: 12 };
-const STRENGTH_REP_RANGE = { min: 4, max: 6 };
-const BLENDED_REP_RANGE = { min: 6, max: 10 };
-
-const DEFAULT_RIR = 2;
-const LONG_REST_SECONDS = 120;
-const SHORT_REST_SECONDS = 75;
 const LARGE_REST_PATTERNS = new Set(["squat", "hinge", "carry"]);
 
 /** Primary/secondary muscle-role scoring weights (docs/02_EXERCISE_RELATIONSHIPS_IMPLEMENTATION.md
@@ -89,7 +80,7 @@ const RELATIONSHIP_BONUS = 2;
  *  - fatigue: a small penalty for higher fatigue cost.
  */
 function scoreExercise(
-  exercise: CatalogExercise,
+  exercise: EligibleExercise,
   sessionMuscles: CanonicalMuscleGroup[],
   weeklyVolumeTargets: Record<CanonicalMuscleGroup, number>,
   trainingBias: TrainingBias,
@@ -126,21 +117,20 @@ function scoreExercise(
   );
 }
 
-function repRangeForBias(trainingBias: TrainingBias): { min: number; max: number } {
-  if (trainingBias.hypertrophy >= 0.6) return HYPERTROPHY_REP_RANGE;
-  if (trainingBias.strength >= 0.6) return STRENGTH_REP_RANGE;
-  return BLENDED_REP_RANGE;
-}
-
 /**
  * Allocates one session's exercises, sets, rep ranges, RIR and rest —
  * pure and deterministic: identical inputs always produce identical
  * output (same candidates in the same order score identically; ties break
  * on canonicalId so output never depends on incidental array ordering).
+ *
+ * Sets/reps/RIR/rest baselines come from each candidate's own resolved
+ * trainee-level programmingProfile (mogd_programming_engine_specs 01/02) —
+ * `trainingBias` still drives candidate *scoring* below, it no longer picks
+ * the rep range (that's the profile's job now).
  */
 export function allocateSession(input: {
   sessionLabel: SessionLabel;
-  candidates: CatalogExercise[];
+  candidates: EligibleExercise[];
   weeklyVolumeTargets: Record<CanonicalMuscleGroup, number>;
   trainingBias: TrainingBias;
   sessionDurationMinutes: number;
@@ -168,37 +158,33 @@ export function allocateSession(input: {
   );
   const selected = scored.slice(0, exerciseCount);
 
-  const totalSetBudget = Math.max(
-    exerciseCount * MIN_SETS_PER_EXERCISE,
-    Math.round(input.sessionDurationMinutes / MINUTES_PER_SET),
-  );
+  const minSetsFloor = selected.reduce((sum, s) => sum + s.exercise.programmingProfile.setsMin, 0);
+  const totalSetBudget = Math.max(minSetsFloor, Math.round(input.sessionDurationMinutes / MINUTES_PER_SET));
   const totalRelevance = selected.reduce((sum, s) => sum + Math.max(s.score, 0.01), 0);
 
-  const { min: repMin, max: repMax } = repRangeForBias(input.trainingBias);
   const roles = assignSessionRoles(selected);
 
   return selected.map((s, index) => {
+    const profile = s.exercise.programmingProfile;
     const share = Math.max(s.score, 0.01) / totalRelevance;
     const sets = Math.min(
-      MAX_SETS_PER_EXERCISE,
-      Math.max(MIN_SETS_PER_EXERCISE, Math.round(totalSetBudget * share)),
+      profile.setsMax,
+      Math.max(profile.setsMin, Math.round(totalSetBudget * share)),
     );
     const restSeconds = LARGE_REST_PATTERNS.has(s.exercise.movementPattern)
-      ? LONG_REST_SECONDS
-      : SHORT_REST_SECONDS;
+      ? profile.restSecondsMax
+      : profile.restSecondsMin;
 
     const baseline = {
       sets,
-      repMin: s.exercise.defaultRepMin ?? repMin,
-      repMax: s.exercise.defaultRepMax ?? repMax,
-      rir: DEFAULT_RIR,
+      repMin: profile.repsMin,
+      repMax: profile.repsMax,
+      rirMin: profile.rirMin,
+      rirMax: profile.rirMax,
       restSeconds,
     };
     const { role, roleReason } = roles[index]!;
-    const contextual = applyRoleModifier(baseline, role, {
-      min: MIN_SETS_PER_EXERCISE,
-      max: MAX_SETS_PER_EXERCISE,
-    });
+    const contextual = applyRoleModifier(baseline, role, { min: profile.setsMin, max: profile.setsMax });
 
     return {
       exerciseId: s.exercise.id,

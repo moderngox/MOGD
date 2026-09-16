@@ -2,6 +2,7 @@ import { eq, desc } from "drizzle-orm";
 import { schema, type Database } from "@mogd/db";
 import { createExerciseInput, updateExerciseInput } from "./schemas";
 import type { CreateExerciseInput, UpdateExerciseInput } from "./schemas";
+import { createDefaultProgrammingProfiles } from "./programmingProfiles";
 
 export class DuplicateCanonicalIdError extends Error {
   constructor(canonicalId: string) {
@@ -22,6 +23,12 @@ export async function createExercise(db: Database, rawInput: CreateExerciseInput
   }
 
   const [exercise] = await db.insert(schema.exercises).values(input).returning();
+  // Every exercise must be schedulable immediately (CLAUDE.md rule 6: "no
+  // global fixed kg required"; mogd_programming_engine_specs 05 acceptance:
+  // an exercise always has a trainee-level profile to resolve) — seed
+  // inherited-default profiles rather than leaving admin to remember to add
+  // them before this exercise can appear in a generated session.
+  await createDefaultProgrammingProfiles(db, exercise!.id);
   return exercise;
 }
 

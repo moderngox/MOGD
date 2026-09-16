@@ -3,20 +3,21 @@
  * progression domain boundary (docs/ARCHITECTURE.md §10-12, §15).
  */
 export * from "./splitTemplates";
-export { getExerciseCandidates, type CatalogExercise } from "./candidatePool";
+export { getExerciseCandidates, type CatalogExercise, type EligibleExercise } from "./candidatePool";
 export { deriveWeeklyVolumeTargets } from "./volumeTargets";
-export {
-  allocateSession,
-  MINUTES_PER_SET,
-  MIN_SETS_PER_EXERCISE,
-  MAX_SETS_PER_EXERCISE,
-  type AllocatedExercise,
-} from "./sessionAllocation";
+export { allocateSession, MINUTES_PER_SET, type AllocatedExercise } from "./sessionAllocation";
 export {
   assignSessionRoles,
   applyRoleModifier,
   ROLE_REASON_OPTIONS,
   type RoleReason,
 } from "./sessionRoleAssignment";
-export { computeProgressionTarget, type ProgressionInput, type ProgressionTarget } from "./progression";
+export {
+  computeProgressionTarget,
+  PROGRESSION_REASON_OPTIONS,
+  type ProgressionInput,
+  type ProgressionTarget,
+  type ProgressionReason,
+  type LoggedSetForProgression,
+} from "./progression";
 export { explainExerciseSelection } from "./explainSelection";

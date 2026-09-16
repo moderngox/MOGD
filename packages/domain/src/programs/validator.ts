@@ -1,7 +1,8 @@
 import type { Database } from "@mogd/db";
-import type { Equipment } from "../assessment/options";
+import type { Equipment, ExperienceLevel } from "../assessment/options";
 import { resolveActiveExercise } from "../exercises/exerciseCatalog";
-import { MINUTES_PER_SET, MIN_SETS_PER_EXERCISE, MAX_SETS_PER_EXERCISE } from "../training/sessionAllocation";
+import { listProgrammingProfiles, resolveApplicableProfile } from "../exercises/programmingProfiles";
+import { MINUTES_PER_SET } from "../training/sessionAllocation";
 import type { SessionLabel } from "../training/splitTemplates";
 import type { AllocatedExercise } from "../training/sessionAllocation";
 
@@ -15,6 +16,7 @@ export interface ProgramPlan {
   sessionsPerWeek: number;
   sessionDurationMinutes: number;
   equipment: Equipment[];
+  experienceLevel: ExperienceLevel;
   workouts: ProgramWorkoutPlan[];
 }
 
@@ -84,9 +86,23 @@ export async function validateProgram(db: Database, plan: ProgramPlan): Promise<
         reasons.push(`"${exercise.canonicalId}" requires equipment the user doesn't have.`);
       }
 
-      if (exercise.sets < MIN_SETS_PER_EXERCISE || exercise.sets > MAX_SETS_PER_EXERCISE) {
+      // Re-resolve the applicable trainee-level profile independently
+      // rather than trusting the generator's own resolution (same
+      // "re-derive every invariant" discipline as the rest of this
+      // function) — mogd_programming_engine_specs 05 acceptance criteria.
+      // Only sets is re-checked against the profile directly: session-role
+      // modifiers (sessionRoleAssignment.ts) deliberately shift rep/RIR
+      // targets outside the baseline profile envelope (e.g. finisher's
+      // higher rep range), so those two aren't independently re-derivable
+      // here without re-running role-modifier logic the validator
+      // shouldn't need to know about.
+      const profiles = await listProgrammingProfiles(db, resolved.id);
+      const profile = resolveApplicableProfile(profiles, plan.experienceLevel);
+      if (!profile) {
+        reasons.push(`"${exercise.canonicalId}" has no enabled programming profile for this user's level.`);
+      } else if (exercise.sets < profile.setsMin || exercise.sets > profile.setsMax) {
         reasons.push(
-          `"${exercise.canonicalId}" has ${exercise.sets} sets, outside the ${MIN_SETS_PER_EXERCISE}-${MAX_SETS_PER_EXERCISE} bounds.`,
+          `"${exercise.canonicalId}" has ${exercise.sets} sets, outside the ${profile.setsMin}-${profile.setsMax} bounds for this profile.`,
         );
       }
     }

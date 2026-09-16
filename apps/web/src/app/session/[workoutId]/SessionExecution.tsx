@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Badge, Button, Input } from "@mogd/ui";
+import { Badge, Button, Checkbox, Input } from "@mogd/ui";
 import type { BadgeVariant } from "@mogd/ui";
 import { logSetAction } from "./actions";
 
@@ -13,7 +13,8 @@ export interface SessionExerciseView {
   sets: number;
   repMin: number;
   repMax: number;
-  rir: number;
+  rirMin: number;
+  rirMax: number;
   restSeconds: number;
   sessionRole: string | null;
   selectionReason: string;
@@ -24,6 +25,7 @@ export interface SessionExerciseView {
     targetRepMin: number;
     targetRepMax: number;
     reason: string;
+    message: string;
   };
 }
 
@@ -50,6 +52,8 @@ function ExerciseCard({
   const [logged, setLogged] = useState<LoggedSet[]>([]);
   const [loadInput, setLoadInput] = useState("");
   const [repsInput, setRepsInput] = useState("");
+  const [painFlag, setPainFlag] = useState(false);
+  const [techniqueConcern, setTechniqueConcern] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -73,9 +77,13 @@ function ExerciseCard({
         setNumber: nextSetNumber,
         loadKg,
         reps,
+        painFlag: painFlag || undefined,
+        techniqueValid: techniqueConcern ? false : undefined,
       });
       setLogged((prev) => [...prev, { setNumber: nextSetNumber, loadKg, reps }]);
       setRepsInput("");
+      setPainFlag(false);
+      setTechniqueConcern(false);
     } catch {
       setError("Could not save this set. Please try again.");
     } finally {
@@ -93,7 +101,7 @@ function ExerciseCard({
           {roleBadge && <Badge variant={roleBadge.variant}>{roleBadge.label}</Badge>}
         </div>
         <span className="text-sm text-zinc-500">
-          {exercise.sets} × {exercise.repMin}-{exercise.repMax} · RIR {exercise.rir} ·{" "}
+          {exercise.sets} × {exercise.repMin}-{exercise.repMax} · RIR {exercise.rirMin}-{exercise.rirMax} ·{" "}
           {exercise.restSeconds}s rest
         </span>
       </div>
@@ -117,7 +125,7 @@ function ExerciseCard({
             : `${exercise.progressionTarget.targetRepMin}-${exercise.progressionTarget.targetRepMax} reps`}
         </span>
       </div>
-      <p className="text-xs text-zinc-500">{exercise.progressionTarget.reason}</p>
+      <p className="text-xs text-zinc-500">{exercise.progressionTarget.message}</p>
 
       {logged.length > 0 && (
         <ul className="text-sm text-zinc-400">
@@ -130,24 +138,40 @@ function ExerciseCard({
       )}
 
       {!done ? (
-        <div className="flex items-end gap-2">
-          <Input
-            type="number"
-            placeholder="Load (kg)"
-            value={loadInput}
-            onChange={(e) => setLoadInput(e.target.value)}
-            className="w-24"
-          />
-          <Input
-            type="number"
-            placeholder="Reps"
-            value={repsInput}
-            onChange={(e) => setRepsInput(e.target.value)}
-            className="w-20"
-          />
-          <Button onClick={logSet} disabled={saving}>
-            Log set {nextSetNumber}/{exercise.sets}
-          </Button>
+        <div className="flex flex-col gap-2">
+          <div className="flex items-end gap-2">
+            <Input
+              type="number"
+              placeholder="Load (kg)"
+              value={loadInput}
+              onChange={(e) => setLoadInput(e.target.value)}
+              className="w-24"
+            />
+            <Input
+              type="number"
+              placeholder="Reps"
+              value={repsInput}
+              onChange={(e) => setRepsInput(e.target.value)}
+              className="w-20"
+            />
+            <Button onClick={logSet} disabled={saving}>
+              Log set {nextSetNumber}/{exercise.sets}
+            </Button>
+          </div>
+          <div className="flex items-center gap-4">
+            <Checkbox
+              id={`${exercise.workoutExerciseId}-pain`}
+              label="Pain"
+              checked={painFlag}
+              onChange={(e) => setPainFlag(e.target.checked)}
+            />
+            <Checkbox
+              id={`${exercise.workoutExerciseId}-technique`}
+              label="Technique concern"
+              checked={techniqueConcern}
+              onChange={(e) => setTechniqueConcern(e.target.checked)}
+            />
+          </div>
         </div>
       ) : (
         <p className="text-sm text-green-400">All sets logged.</p>

@@ -18,8 +18,6 @@ function mockExercise(overrides: Partial<CatalogExercise> = {}): CatalogExercise
     strengthScore: null,
     fatigueScore: null,
     stabilityDemand: null,
-    defaultRepMin: null,
-    defaultRepMax: null,
     contraindicationTags: [],
     instructions: null,
     isActive: true,
@@ -90,14 +88,14 @@ describe("assignSessionRoles", () => {
 });
 
 describe("applyRoleModifier", () => {
-  const baseline = { sets: 3, repMin: 8, repMax: 12, rir: 2, restSeconds: 90 };
+  const baseline = { sets: 3, repMin: 8, repMax: 12, rirMin: 1, rirMax: 3, restSeconds: 90 };
   const setsBounds = { min: 2, max: 5 };
 
   it("narrows reps, lowers RIR, shortens rest and reduces sets for finisher", () => {
     const result = applyRoleModifier(baseline, "finisher", setsBounds);
     expect(result.repMin).toBeGreaterThan(baseline.repMin);
     expect(result.repMax).toBeGreaterThan(baseline.repMax);
-    expect(result.rir).toBeLessThanOrEqual(2);
+    expect(result.rirMax).toBeLessThanOrEqual(2);
     expect(result.restSeconds).toBeLessThan(baseline.restSeconds);
     expect(result.sets).toBeLessThan(baseline.sets);
   });

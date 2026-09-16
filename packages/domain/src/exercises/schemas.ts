@@ -35,8 +35,6 @@ const exerciseFields = z.object({
   strengthScore: z.coerce.number().min(0).max(10).optional(),
   fatigueScore: z.coerce.number().min(0).max(10).optional(),
   stabilityDemand: z.coerce.number().min(0).max(10).optional(),
-  defaultRepMin: z.coerce.number().int().min(1).max(100).optional(),
-  defaultRepMax: z.coerce.number().int().min(1).max(100).optional(),
   // Free-form for now — no reviewed contraindication taxonomy exists yet
   // (see docs/AI_AND_SAFETY.md caution against inventing unapproved
   // clinical categories). Admin enters plain tags.

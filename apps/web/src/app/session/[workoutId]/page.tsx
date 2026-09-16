@@ -35,13 +35,13 @@ export default async function SessionPage({
   const exercises: SessionExerciseView[] = [];
   for (const exercise of workout.exercises) {
     const previous = await progress.getPreviousPerformance(db, session.user.id, exercise.exerciseId);
-    const target = await progress.getProgressionTargetForExercise(
-      db,
-      session.user.id,
-      exercise.exerciseId,
-      exercise.repMin,
-      exercise.repMax,
-    );
+    const target = await progress.getProgressionTargetForExercise(db, session.user.id, exercise.exerciseId, {
+      sets: exercise.sets,
+      repMin: exercise.repMin,
+      repMax: exercise.repMax,
+      rirMin: exercise.rirMin,
+      rirMax: exercise.rirMax,
+    });
 
     exercises.push({
       workoutExerciseId: exercise.workoutExerciseId,
@@ -50,7 +50,8 @@ export default async function SessionPage({
       sets: exercise.sets,
       repMin: exercise.repMin,
       repMax: exercise.repMax,
-      rir: exercise.rir,
+      rirMin: exercise.rirMin,
+      rirMax: exercise.rirMax,
       restSeconds: exercise.restSeconds,
       sessionRole: exercise.sessionRole,
       selectionReason: exercise.selectionReason,
@@ -66,6 +67,7 @@ export default async function SessionPage({
         targetRepMin: target.targetRepMin,
         targetRepMax: target.targetRepMax,
         reason: target.reason,
+        message: target.message,
       },
     });
   }

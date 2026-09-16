@@ -28,8 +28,6 @@ export const exercises = sqliteTable("exercise", {
   strengthScore: real("strengthScore"),
   fatigueScore: real("fatigueScore"),
   stabilityDemand: real("stabilityDemand"),
-  defaultRepMin: integer("defaultRepMin"),
-  defaultRepMax: integer("defaultRepMax"),
   contraindicationTags: text("contraindicationTags", { mode: "json" }).$type<string[]>().notNull(),
   instructions: text("instructions"),
   isActive: integer("isActive", { mode: "boolean" }).notNull().default(true),

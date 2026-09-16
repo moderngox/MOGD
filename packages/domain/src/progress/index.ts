@@ -5,6 +5,8 @@
 export { logWorkoutSet, logSetInput, type LogSetInput } from "./logSet";
 export {
   getPreviousPerformance,
+  getRecentSessionPerformance,
   getProgressionTargetForExercise,
   type PreviousPerformance,
+  type RecentSessionSet,
 } from "./previousPerformance";

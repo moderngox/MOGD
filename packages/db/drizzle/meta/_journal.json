@@ -78,6 +78,27 @@
       "when": 1789571066817,
       "tag": "0010_session_role_eligibility",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1789573638495,
+      "tag": "0011_programming_profiles",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1789573649659,
+      "tag": "0012_drop_workout_exercise_rir",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1789573681190,
+      "tag": "0013_add_workout_exercise_rir_range",
+      "breakpoints": true
     }
   ]
 }

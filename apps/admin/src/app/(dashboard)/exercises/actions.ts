@@ -37,6 +37,17 @@ export async function setExerciseActiveAction(id: string, isActive: boolean) {
   revalidatePath(`/exercises/${id}`);
 }
 
+export async function upsertProgrammingProfileAction(
+  exerciseId: string,
+  traineeLevel: exercises.ProgrammingProfile["traineeLevel"],
+  input: exercises.UpsertProgrammingProfileInput,
+) {
+  await requireAdminSession();
+  const profile = await exercises.upsertProgrammingProfile(getDb(), exerciseId, traineeLevel, input);
+  revalidatePath(`/exercises/${exerciseId}`);
+  return profile;
+}
+
 export async function createRelationshipAction(
   exerciseId: string,
   relatedExerciseId: string,
