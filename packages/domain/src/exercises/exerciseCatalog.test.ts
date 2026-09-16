@@ -21,6 +21,7 @@ const validInput: CreateExerciseInput = {
   equipment: ["dumbbells"],
   contraindicationTags: [],
   isActive: true,
+  allowedSessionRoles: [],
 };
 
 describe("exerciseCatalog", () => {

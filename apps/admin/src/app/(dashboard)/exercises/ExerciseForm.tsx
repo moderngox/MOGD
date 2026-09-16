@@ -7,7 +7,7 @@ import { Button, Card, Checkbox, Input, Select, Textarea } from "@mogd/ui";
 import { exercises, physique } from "@mogd/domain";
 import { createExerciseAction, updateExerciseAction } from "./actions";
 
-const { MOVEMENT_PATTERN_OPTIONS, EXERCISE_DIFFICULTY_OPTIONS, EQUIPMENT_OPTIONS } = exercises;
+const { MOVEMENT_PATTERN_OPTIONS, EXERCISE_DIFFICULTY_OPTIONS, EQUIPMENT_OPTIONS, SESSION_ROLE_OPTIONS } = exercises;
 const { CANONICAL_MUSCLE_GROUPS } = physique;
 
 function label(value: string): string {
@@ -31,6 +31,8 @@ export interface ExerciseFormValue {
   contraindicationTags: string[];
   instructions?: string;
   isActive: boolean;
+  allowedSessionRoles: string[];
+  preferredSessionRole?: string;
 }
 
 const EMPTY: ExerciseFormValue = {
@@ -43,6 +45,7 @@ const EMPTY: ExerciseFormValue = {
   equipment: [],
   contraindicationTags: [],
   isActive: true,
+  allowedSessionRoles: [],
 };
 
 export function ExerciseForm({
@@ -76,6 +79,21 @@ export function ExerciseForm({
       "equipment",
       current.includes(value) ? current.filter((v) => v !== value) : [...current, value],
     );
+  }
+
+  /** Kept in canonical SESSION_ROLE_OPTIONS order (not click order) — the
+   * assignment engine's last-resort fallback picks allowedRoles[0], which
+   * must be deterministic (packages/domain/src/training/sessionRoleAssignment.ts). */
+  function toggleSessionRole(value: string) {
+    const current = form.allowedSessionRoles;
+    const next = current.includes(value)
+      ? current.filter((v) => v !== value)
+      : [...current, value].sort(
+          (a, b) =>
+            SESSION_ROLE_OPTIONS.indexOf(a as (typeof SESSION_ROLE_OPTIONS)[number]) -
+            SESSION_ROLE_OPTIONS.indexOf(b as (typeof SESSION_ROLE_OPTIONS)[number]),
+        );
+    set("allowedSessionRoles", next);
   }
 
   async function save() {
@@ -253,6 +271,47 @@ export function ExerciseForm({
             onChange={(e) => set("defaultRepMax", e.target.value ? Number(e.target.value) : undefined)}
           />
         </div>
+      </Card>
+
+      <Card title="Session Roles">
+        <p className="text-xs text-fg-secondary">
+          What this exercise CAN be used as. The engine assigns the actual role per generated
+          session — this is eligibility, not an assignment.
+        </p>
+        <div>
+          <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-fg-secondary">
+            Allowed roles
+          </p>
+          <div className="grid grid-cols-2 gap-1 sm:grid-cols-4">
+            {SESSION_ROLE_OPTIONS.map((r) => (
+              <Checkbox
+                key={r}
+                id={`session-role-${r}`}
+                label={label(r)}
+                checked={form.allowedSessionRoles.includes(r)}
+                onChange={() => toggleSessionRole(r)}
+              />
+            ))}
+          </div>
+        </div>
+
+        <Select
+          value={form.preferredSessionRole ?? ""}
+          onChange={(e) => set("preferredSessionRole", e.target.value || undefined)}
+        >
+          <option value="">Preferred role (none)</option>
+          {SESSION_ROLE_OPTIONS.map((r) => (
+            <option key={r} value={r}>
+              {label(r)}
+            </option>
+          ))}
+        </Select>
+
+        {form.isActive && form.allowedSessionRoles.length === 0 && (
+          <p className="text-xs text-status-caution">
+            No allowed roles set — this exercise will only ever be assigned Accessory.
+          </p>
+        )}
       </Card>
 
       <Card title="Safety">

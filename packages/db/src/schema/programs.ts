@@ -59,9 +59,26 @@ export const workoutExercises = sqliteTable("workout_exercise", {
   restSeconds: integer("restSeconds").notNull(),
   // Nullable, not backfilled: rows generated before this field existed
   // simply have no role (see packages/domain/src/training/sessionAllocation.ts).
+  // Engine-assigned per docs/MOGD_06-session-role-architecture.md — never an
+  // immutable property of the exercise itself (see exercises.allowedSessionRoles).
   sessionRole: text("sessionRole", {
-    enum: ["primary", "accessory", "superset", "finisher", "warmup"],
+    enum: ["main", "accessory", "superset", "finisher"],
   }),
+  // Machine-readable "why this role" (docs/MOGD_06 §10) — nullable, same
+  // not-backfilled convention as sessionRole.
+  roleReason: text("roleReason", {
+    enum: [
+      "PREFERRED_ROLE",
+      "STRONGEST_MAIN_CANDIDATE",
+      "ONLY_ELIGIBLE_ROLE",
+      "TAIL_POSITION_FINISHER",
+      "DEFAULT_ACCESSORY_FALLBACK",
+      "NO_CONFIG_DEFAULT_ACCESSORY",
+    ],
+  }),
+  // Unused by the engine yet (superset ships unpaired in v1) — reserved so a
+  // future pairing pass has somewhere to write without another migration.
+  supersetGroupId: text("supersetGroupId"),
 });
 
 /**

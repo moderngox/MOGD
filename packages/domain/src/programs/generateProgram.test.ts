@@ -5,8 +5,14 @@ import { schema, type Database } from "@mogd/db";
 import { createExercise } from "../exercises/exerciseCatalog";
 import { generateStrategyAndNutrition } from "../nutrition/generateStrategy";
 import { generateProgram, StrategyIncompleteError } from "./generateProgram";
-import { SESSION_ROLE_OPTIONS } from "../training/sessionAllocation";
+import { SESSION_ROLE_OPTIONS } from "../exercises/options";
 import type { CreateExerciseInput } from "../exercises/schemas";
+
+// Permissive allowedSessionRoles on every fixture exercise so the new
+// eligibility-aware engine has real role data to assign against — an empty
+// array would make every exercise fall into the NO_CONFIG_DEFAULT_ACCESSORY
+// fallback and the "main"/"finisher" assertions below could never pass.
+const ALL_ROLES = [...SESSION_ROLE_OPTIONS];
 
 const CATALOG: CreateExerciseInput[] = [
   {
@@ -19,6 +25,7 @@ const CATALOG: CreateExerciseInput[] = [
     equipment: ["dumbbells"],
     contraindicationTags: [],
     isActive: true,
+    allowedSessionRoles: ALL_ROLES,
   },
   {
     canonicalId: "neutral_grip_lat_pulldown",
@@ -30,6 +37,7 @@ const CATALOG: CreateExerciseInput[] = [
     equipment: ["pull_up_bar"],
     contraindicationTags: [],
     isActive: true,
+    allowedSessionRoles: ALL_ROLES,
   },
   {
     canonicalId: "cable_lateral_raise",
@@ -41,6 +49,7 @@ const CATALOG: CreateExerciseInput[] = [
     equipment: ["dumbbells"],
     contraindicationTags: [],
     isActive: true,
+    allowedSessionRoles: ALL_ROLES,
   },
   {
     canonicalId: "bulgarian_split_squat",
@@ -52,6 +61,7 @@ const CATALOG: CreateExerciseInput[] = [
     equipment: ["dumbbells"],
     contraindicationTags: [],
     isActive: true,
+    allowedSessionRoles: ALL_ROLES,
   },
   {
     canonicalId: "romanian_deadlift",
@@ -63,6 +73,7 @@ const CATALOG: CreateExerciseInput[] = [
     equipment: ["dumbbells"],
     contraindicationTags: [],
     isActive: true,
+    allowedSessionRoles: ALL_ROLES,
   },
   {
     canonicalId: "hanging_leg_raise",
@@ -74,6 +85,7 @@ const CATALOG: CreateExerciseInput[] = [
     equipment: ["pull_up_bar"],
     contraindicationTags: [],
     isActive: true,
+    allowedSessionRoles: ALL_ROLES,
   },
 ];
 
@@ -152,7 +164,7 @@ describe("generateProgram", () => {
     }
   });
 
-  it("persists 'primary' on the first exercise and 'finisher' on the last, per workout", async () => {
+  it("persists 'main' on the first exercise and 'finisher' on the last, per workout", async () => {
     const userId = await seedUser(db);
     await generateStrategyAndNutrition(db, userId);
     await generateProgram(db, userId);
@@ -165,7 +177,7 @@ describe("generateProgram", () => {
         .where(eq(schema.workoutExercises.workoutId, workout.id))
         .orderBy(schema.workoutExercises.orderIndex);
 
-      expect(exercises[0]?.sessionRole).toBe("primary");
+      expect(exercises[0]?.sessionRole).toBe("main");
       if (exercises.length > 1) {
         expect(exercises.at(-1)?.sessionRole).toBe("finisher");
       }
@@ -188,6 +200,7 @@ describe("generateProgram", () => {
       equipment: ["barbell"],
       contraindicationTags: [],
       isActive: true,
+      allowedSessionRoles: [],
     });
     await generateStrategyAndNutrition(db, userId);
     await generateProgram(db, userId);

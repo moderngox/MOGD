@@ -130,6 +130,10 @@ export async function generateProgram(db: Database, userId: string): Promise<Gen
           rir: exercise.rir,
           restSeconds: exercise.restSeconds,
           sessionRole: exercise.sessionRole,
+          roleReason: exercise.roleReason,
+          // Unpopulated in v1 — superset ships as an assignable-but-unpaired
+          // role (docs/MOGD_06-session-role-architecture.md); column is
+          // reserved for a future pairing pass.
         });
       }
     }

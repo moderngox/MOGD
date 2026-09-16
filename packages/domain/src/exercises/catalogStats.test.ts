@@ -16,6 +16,7 @@ const base: CreateExerciseInput = {
   equipment: ["dumbbells"],
   contraindicationTags: [],
   isActive: true,
+  allowedSessionRoles: [],
 };
 
 describe("getCatalogStats", () => {

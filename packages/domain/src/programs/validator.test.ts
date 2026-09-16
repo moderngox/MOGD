@@ -25,6 +25,7 @@ describe("validateProgram", () => {
       equipment: ["dumbbells"],
       contraindicationTags: [],
       isActive: true,
+      allowedSessionRoles: [],
     });
     exerciseId = exercise!.id;
     canonicalId = exercise!.canonicalId;
@@ -54,7 +55,8 @@ describe("validateProgram", () => {
               repMax: 12,
               rir: 2,
               restSeconds: 90,
-              sessionRole: "primary",
+              sessionRole: "main",
+              roleReason: "STRONGEST_MAIN_CANDIDATE",
             },
           ],
         },

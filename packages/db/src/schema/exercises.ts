@@ -1,6 +1,11 @@
 import { sqliteTable, text, integer, real, uniqueIndex } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
 
+/** Kept in sync by hand with packages/domain/src/exercises/options.ts's
+ * SESSION_ROLE_OPTIONS — packages/db never imports from packages/domain
+ * (same convention already used by exerciseRelationships.ts's enum). */
+const SESSION_ROLE_VALUES = ["main", "accessory", "superset", "finisher"] as const;
+
 /**
  * Canonical exercise identity + programming metadata (docs/ARCHITECTURE.md
  * §7). Unlike exerciseAssets below, this row is directly editable by admin
@@ -28,6 +33,22 @@ export const exercises = sqliteTable("exercise", {
   contraindicationTags: text("contraindicationTags", { mode: "json" }).$type<string[]>().notNull(),
   instructions: text("instructions"),
   isActive: integer("isActive", { mode: "boolean" }).notNull().default(true),
+  /**
+   * Role ELIGIBILITY, not assignment (docs/MOGD_06-session-role-architecture.md
+   * §3 core rule: "Admin defines what roles an exercise CAN/SHOULD normally
+   * fulfill. The engine assigns what role the exercise IS fulfilling.").
+   * Empty array = not configured yet, never null — one "unconfigured"
+   * representation. Not enforced as "must have at least one" at this layer;
+   * that's a soft admin-form hint, not a hard constraint (would break every
+   * pre-existing row on migration day).
+   */
+  allowedSessionRoles: text("allowedSessionRoles", { mode: "json" })
+    .$type<string[]>()
+    .notNull()
+    .default(sql`'[]'`),
+  /** Bias, not a forced assignment — the engine may still pick a different
+   * allowed role when session context requires it (docs/MOGD_06 §3). */
+  preferredSessionRole: text("preferredSessionRole", { enum: SESSION_ROLE_VALUES }),
   createdAt: integer("createdAt", { mode: "timestamp_ms" })
     .notNull()
     .$defaultFn(() => new Date()),

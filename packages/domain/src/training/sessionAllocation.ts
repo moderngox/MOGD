@@ -1,8 +1,11 @@
 import type { CanonicalMuscleGroup } from "../physique/muscles";
 import type { TrainingBias } from "../physique/goalStrategy";
+import type { SessionRole } from "../exercises/options";
 import type { SessionLabel } from "./splitTemplates";
 import { SESSION_MUSCLE_MAP } from "./splitTemplates";
 import type { CatalogExercise } from "./candidatePool";
+import { assignSessionRoles, applyRoleModifier } from "./sessionRoleAssignment";
+import type { RoleReason } from "./sessionRoleAssignment";
 
 export interface AllocatedExercise {
   exerciseId: string;
@@ -13,19 +16,12 @@ export interface AllocatedExercise {
   repMax: number;
   rir: number;
   restSeconds: number;
+  /** Engine-assigned per docs/MOGD_06-session-role-architecture.md — never a
+   * property of the canonical exercise (see exercises.allowedSessionRoles/
+   * preferredSessionRole for what the exercise merely permits). */
   sessionRole: SessionRole;
+  roleReason: RoleReason;
 }
-
-/**
- * Per-workout-item label (docs/01_EXERCISE_RELATIONSHIPS_ARCHITECTURE.md §1,
- * docs/02_EXERCISE_RELATIONSHIPS_IMPLEMENTATION.md §5) — deliberately NOT a
- * property of the canonical exercise, since the same exercise can be
- * PRIMARY in one session and FINISHER in another. "superset"/"warmup" are
- * part of the vocabulary but not produced by sessionRoleForPosition below;
- * nothing in this codebase assigns them yet.
- */
-export const SESSION_ROLE_OPTIONS = ["primary", "accessory", "superset", "finisher", "warmup"] as const;
-export type SessionRole = (typeof SESSION_ROLE_OPTIONS)[number];
 
 /**
  * How many distinct exercises a session gets, by duration — a lookup
@@ -130,18 +126,6 @@ function scoreExercise(
   );
 }
 
-/**
- * Positional rule, matching docs/01 §4's own example (best-scoring first =
- * PRIMARY, weakest/last = FINISHER, everything between = ACCESSORY). A
- * 1-exercise session gets "primary" only — the primary check wins over the
- * finisher check when index 0 is also the last index.
- */
-function sessionRoleForPosition(index: number, total: number): SessionRole {
-  if (index === 0) return "primary";
-  if (index === total - 1) return "finisher";
-  return "accessory";
-}
-
 function repRangeForBias(trainingBias: TrainingBias): { min: number; max: number } {
   if (trainingBias.hypertrophy >= 0.6) return HYPERTROPHY_REP_RANGE;
   if (trainingBias.strength >= 0.6) return STRENGTH_REP_RANGE;
@@ -191,6 +175,7 @@ export function allocateSession(input: {
   const totalRelevance = selected.reduce((sum, s) => sum + Math.max(s.score, 0.01), 0);
 
   const { min: repMin, max: repMax } = repRangeForBias(input.trainingBias);
+  const roles = assignSessionRoles(selected);
 
   return selected.map((s, index) => {
     const share = Math.max(s.score, 0.01) / totalRelevance;
@@ -202,16 +187,26 @@ export function allocateSession(input: {
       ? LONG_REST_SECONDS
       : SHORT_REST_SECONDS;
 
-    return {
-      exerciseId: s.exercise.id,
-      canonicalId: s.exercise.canonicalId,
-      orderIndex: index,
+    const baseline = {
       sets,
       repMin: s.exercise.defaultRepMin ?? repMin,
       repMax: s.exercise.defaultRepMax ?? repMax,
       rir: DEFAULT_RIR,
       restSeconds,
-      sessionRole: sessionRoleForPosition(index, selected.length),
+    };
+    const { role, roleReason } = roles[index]!;
+    const contextual = applyRoleModifier(baseline, role, {
+      min: MIN_SETS_PER_EXERCISE,
+      max: MAX_SETS_PER_EXERCISE,
+    });
+
+    return {
+      exerciseId: s.exercise.id,
+      canonicalId: s.exercise.canonicalId,
+      orderIndex: index,
+      ...contextual,
+      sessionRole: role,
+      roleReason,
     };
   });
 }

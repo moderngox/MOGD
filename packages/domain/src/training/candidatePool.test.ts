@@ -23,6 +23,7 @@ describe("getExerciseCandidates", () => {
       equipment: ["dumbbells"],
       contraindicationTags: [],
       isActive: true,
+      allowedSessionRoles: [],
     });
     await createExercise(db, {
       canonicalId: "barbell_back_squat",
@@ -34,6 +35,7 @@ describe("getExerciseCandidates", () => {
       equipment: ["barbell"],
       contraindicationTags: [],
       isActive: true,
+      allowedSessionRoles: [],
     });
     await createExercise(db, {
       canonicalId: "retired_move",
@@ -45,6 +47,7 @@ describe("getExerciseCandidates", () => {
       equipment: [],
       contraindicationTags: [],
       isActive: false,
+      allowedSessionRoles: [],
     });
   });
 

@@ -63,3 +63,14 @@ export const RELATIONSHIP_ACTION_OPTIONS = [
   "alternative",
 ] as const;
 export type RelationshipAction = (typeof RELATIONSHIP_ACTION_OPTIONS)[number];
+
+/**
+ * docs/MOGD_06-session-role-architecture.md §2. This is the exercise's
+ * ELIGIBILITY vocabulary (allowedSessionRoles/preferredSessionRole) — the
+ * same four values also describe the role the engine actually assigns on a
+ * generated workout item (packages/domain/src/training/sessionRoleAssignment.ts),
+ * declared once here since both live inside packages/domain (no cross-package
+ * barrier forcing a hand-synced duplicate, unlike packages/db's schema enums).
+ */
+export const SESSION_ROLE_OPTIONS = ["main", "accessory", "superset", "finisher"] as const;
+export type SessionRole = (typeof SESSION_ROLE_OPTIONS)[number];

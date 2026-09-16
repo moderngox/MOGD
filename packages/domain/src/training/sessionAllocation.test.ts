@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { allocateSession } from "./sessionAllocation";
 import type { CatalogExercise } from "./candidatePool";
 import type { CanonicalMuscleGroup } from "../physique/muscles";
+import { SESSION_ROLE_OPTIONS } from "../exercises/options";
 
 let counter = 0;
 function mockExercise(overrides: Partial<CatalogExercise>): CatalogExercise {
@@ -24,6 +25,10 @@ function mockExercise(overrides: Partial<CatalogExercise>): CatalogExercise {
     contraindicationTags: [],
     instructions: null,
     isActive: true,
+    // Permissive by default so tests exercise real role-assignment branches
+    // instead of always hitting the unconfigured fallback.
+    allowedSessionRoles: [...SESSION_ROLE_OPTIONS],
+    preferredSessionRole: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,
@@ -166,7 +171,7 @@ describe("allocateSession", () => {
     expect(result[0]?.canonicalId).toBe("related_exercise");
   });
 
-  it("assigns 'primary' to the only exercise in a 1-exercise session", () => {
+  it("assigns 'main' to the only exercise in a 1-exercise session", () => {
     const only = mockExercise({ primaryMuscles: ["upper_chest"] as CanonicalMuscleGroup[] });
     const result = allocateSession({
       sessionLabel: "push",
@@ -175,10 +180,10 @@ describe("allocateSession", () => {
       trainingBias: { hypertrophy: 0.75, strength: 0.25 },
       sessionDurationMinutes: 30,
     });
-    expect(result.map((e) => e.sessionRole)).toEqual(["primary"]);
+    expect(result.map((e) => e.sessionRole)).toEqual(["main"]);
   });
 
-  it("assigns 'primary' and 'finisher' in a 2-exercise session, no 'accessory'", () => {
+  it("assigns 'main' and 'finisher' in a 2-exercise session, no 'accessory'", () => {
     const candidates = Array.from({ length: 2 }, (_, i) =>
       mockExercise({ canonicalId: `ex_${i}`, primaryMuscles: ["upper_chest"] as CanonicalMuscleGroup[] }),
     );
@@ -189,10 +194,10 @@ describe("allocateSession", () => {
       trainingBias: { hypertrophy: 0.75, strength: 0.25 },
       sessionDurationMinutes: 30,
     });
-    expect(result.map((e) => e.sessionRole)).toEqual(["primary", "finisher"]);
+    expect(result.map((e) => e.sessionRole)).toEqual(["main", "finisher"]);
   });
 
-  it("assigns 'primary' first, 'finisher' last, and 'accessory' in between for 3+ exercises", () => {
+  it("assigns 'main' first, 'finisher' last, and 'accessory' in between for 3+ exercises", () => {
     const candidates = Array.from({ length: 3 }, (_, i) =>
       mockExercise({ canonicalId: `ex_${i}`, primaryMuscles: ["upper_chest"] as CanonicalMuscleGroup[] }),
     );
@@ -203,7 +208,7 @@ describe("allocateSession", () => {
       trainingBias: { hypertrophy: 0.75, strength: 0.25 },
       sessionDurationMinutes: 30,
     });
-    expect(result.map((e) => e.sessionRole)).toEqual(["primary", "accessory", "finisher"]);
+    expect(result.map((e) => e.sessionRole)).toEqual(["main", "accessory", "finisher"]);
   });
 
   it("is deterministic: identical inputs produce identical output", () => {

@@ -53,6 +53,8 @@ export default async function EditExercisePage({
           contraindicationTags: exercise.contraindicationTags,
           instructions: exercise.instructions ?? undefined,
           isActive: exercise.isActive,
+          allowedSessionRoles: exercise.allowedSessionRoles,
+          preferredSessionRole: exercise.preferredSessionRole ?? undefined,
         }}
       />
       <RelationshipsSection

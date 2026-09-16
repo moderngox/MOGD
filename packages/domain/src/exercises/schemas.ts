@@ -6,6 +6,7 @@ import {
   EXERCISE_DIFFICULTY_OPTIONS,
   ASSET_TYPE_OPTIONS,
   RELATIONSHIP_ACTION_OPTIONS,
+  SESSION_ROLE_OPTIONS,
 } from "./options";
 
 /**
@@ -22,7 +23,7 @@ export const canonicalIdSchema = z
 
 const boundedText = z.string().trim().max(2000);
 
-export const createExerciseInput = z.object({
+const exerciseFields = z.object({
   canonicalId: canonicalIdSchema,
   name: z.string().trim().min(1).max(120),
   movementPattern: z.enum(MOVEMENT_PATTERN_OPTIONS),
@@ -42,11 +43,36 @@ export const createExerciseInput = z.object({
   contraindicationTags: z.array(z.string().trim().max(60)).default([]),
   instructions: boundedText.optional(),
   isActive: z.coerce.boolean().default(true),
+  // Eligibility, not assignment (docs/MOGD_06-session-role-architecture.md
+  // §3) — the engine assigns the actual role per generated session.
+  allowedSessionRoles: z.array(z.enum(SESSION_ROLE_OPTIONS)).default([]),
+  preferredSessionRole: z.enum(SESSION_ROLE_OPTIONS).optional(),
 });
+
+/**
+ * "Preferred role must be one of the allowed roles" (docs/MOGD_06 §4). A
+ * plain input-shape constraint, so it's a Zod .refine() rather than a
+ * thrown service-layer error (contrast relationships.ts's
+ * SelfReferentialRelationshipError, which depends on DB state, not just
+ * input shape). Applied to both derived schemas below independently — Zod 3
+ * has no .omit() on the ZodEffects a .refine() produces, so canonicalId must
+ * be omitted from the plain object base *before* either schema is refined.
+ */
+function preferredRoleMustBeAllowed(data: { allowedSessionRoles: string[]; preferredSessionRole?: string }) {
+  return !data.preferredSessionRole || data.allowedSessionRoles.includes(data.preferredSessionRole);
+}
+const REFINE_OPTIONS: { message: string; path: (string | number)[] } = {
+  message: "Preferred role must be one of the allowed roles",
+  path: ["preferredSessionRole"],
+};
+
+export const createExerciseInput = exerciseFields.refine(preferredRoleMustBeAllowed, REFINE_OPTIONS);
 export type CreateExerciseInput = z.infer<typeof createExerciseInput>;
 
 /** Same fields, minus the immutable canonicalId. */
-export const updateExerciseInput = createExerciseInput.omit({ canonicalId: true });
+export const updateExerciseInput = exerciseFields
+  .omit({ canonicalId: true })
+  .refine(preferredRoleMustBeAllowed, REFINE_OPTIONS);
 export type UpdateExerciseInput = z.infer<typeof updateExerciseInput>;
 
 export const createDraftAssetInput = z.object({

@@ -32,6 +32,7 @@ describe("progress logging and previous performance", () => {
       equipment: ["dumbbells"],
       contraindicationTags: [],
       isActive: true,
+      allowedSessionRoles: [],
     });
     exerciseId = exercise!.id;
   });

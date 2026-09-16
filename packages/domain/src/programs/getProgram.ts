@@ -3,7 +3,7 @@ import { schema, type Database } from "@mogd/db";
 import { getPublishedAsset } from "../exercises/assetService";
 import { explainExerciseSelection } from "../training/explainSelection";
 import type { SessionLabel } from "../training/splitTemplates";
-import type { SessionRole } from "../training/sessionAllocation";
+import type { SessionRole } from "../exercises/options";
 
 export interface ProgramWorkoutExerciseView {
   workoutExerciseId: string;

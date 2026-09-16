@@ -35,10 +35,9 @@ interface LoggedSet {
 
 /** "accessory" is the unmarked default — no badge for it, to avoid a badge on every card. */
 const SESSION_ROLE_BADGES: Record<string, { label: string; variant: BadgeVariant }> = {
-  primary: { label: "Primary", variant: "current" },
+  main: { label: "Main", variant: "current" },
   finisher: { label: "Finisher", variant: "warning" },
   superset: { label: "Superset", variant: "info" },
-  warmup: { label: "Warm-up", variant: "neutral" },
 };
 
 function ExerciseCard({

@@ -71,6 +71,13 @@
       "when": 1789567084854,
       "tag": "0009_session_role",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1789571066817,
+      "tag": "0010_session_role_eligibility",
+      "breakpoints": true
     }
   ]
 }

@@ -24,6 +24,7 @@ function exerciseInput(canonicalId: string, name: string): CreateExerciseInput {
     equipment: ["pull_up_bar"],
     contraindicationTags: [],
     isActive: true,
+    allowedSessionRoles: [],
   };
 }
 
