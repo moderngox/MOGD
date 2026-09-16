@@ -8,6 +8,7 @@
 export const CANONICAL_MUSCLE_GROUPS = [
   "upper_chest",
   "mid_chest",
+  "lower_chest",
   "lats",
   "upper_back",
   "traps",

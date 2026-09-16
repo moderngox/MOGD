@@ -58,6 +58,7 @@ export const SESSION_MUSCLE_MAP: Record<SessionLabel, CanonicalMuscleGroup[]> = 
   full_body: [
     "upper_chest",
     "mid_chest",
+    "lower_chest",
     "lats",
     "upper_back",
     "lateral_deltoids",
@@ -71,6 +72,7 @@ export const SESSION_MUSCLE_MAP: Record<SessionLabel, CanonicalMuscleGroup[]> = 
   upper: [
     "upper_chest",
     "mid_chest",
+    "lower_chest",
     "lats",
     "upper_back",
     "traps",
@@ -82,7 +84,7 @@ export const SESSION_MUSCLE_MAP: Record<SessionLabel, CanonicalMuscleGroup[]> = 
     "forearms",
   ],
   lower: ["quadriceps", "hamstrings", "glutes", "calves", "rectus_abdominis", "obliques"],
-  push: ["upper_chest", "mid_chest", "anterior_deltoids", "lateral_deltoids", "triceps"],
+  push: ["upper_chest", "mid_chest", "lower_chest", "anterior_deltoids", "lateral_deltoids", "triceps"],
   pull: ["lats", "upper_back", "traps", "posterior_deltoids", "biceps", "forearms"],
   legs: ["quadriceps", "hamstrings", "glutes", "calves"],
 };

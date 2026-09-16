@@ -154,6 +154,7 @@ Initial canonical groups:
 ```text
 upper_chest
 mid_chest
+lower_chest
 
 lats
 upper_back
