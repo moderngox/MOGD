@@ -36,3 +36,19 @@ export async function setExerciseActiveAction(id: string, isActive: boolean) {
   revalidatePath("/exercises");
   revalidatePath(`/exercises/${id}`);
 }
+
+export async function createRelationshipAction(
+  exerciseId: string,
+  relatedExerciseId: string,
+  action: exercises.RelationshipAction,
+) {
+  await requireAdminSession();
+  await exercises.createExerciseRelationship(getDb(), { exerciseId, relatedExerciseId, action });
+  revalidatePath(`/exercises/${exerciseId}`);
+}
+
+export async function deleteRelationshipAction(exerciseId: string, relationshipId: string) {
+  await requireAdminSession();
+  await exercises.deleteRelationship(getDb(), relationshipId);
+  revalidatePath(`/exercises/${exerciseId}`);
+}

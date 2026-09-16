@@ -53,6 +53,20 @@ const LONG_REST_SECONDS = 120;
 const SHORT_REST_SECONDS = 75;
 const LARGE_REST_PATTERNS = new Set(["squat", "hinge", "carry"]);
 
+/** Primary/secondary muscle-role scoring weights (docs/02_EXERCISE_RELATIONSHIPS_IMPLEMENTATION.md
+ * §4's "recommendation configuration", not per-exercise data). Values are the
+ * existing tuned constants, unchanged — this is a naming extraction only. */
+export const MUSCLE_ROLE_WEIGHTS = { PRIMARY: 1.0, SECONDARY: 0.3 } as const;
+
+/**
+ * Small flat bonus for a candidate that's a known relationship (progression/
+ * regression/variation/alternative) of a caller-supplied reference exercise
+ * — see relatedExerciseIds on allocateSession's input. Illustrative/provisional,
+ * like this file's other weights (line above); kept small relative to
+ * QUALITY_WEIGHT * quality so it nudges selection rather than dominating it.
+ */
+const RELATIONSHIP_BONUS = 2;
+
 /**
  * Weighted-sum candidate score (the architecture reviewed in SPIDRA's
  * score-candidates.ts — explicit small weights per contributing factor,
@@ -71,15 +85,16 @@ function scoreExercise(
   sessionMuscles: CanonicalMuscleGroup[],
   weeklyVolumeTargets: Record<CanonicalMuscleGroup, number>,
   trainingBias: TrainingBias,
+  relatedExerciseIds?: Set<string>,
 ): number {
   const sessionMuscleSet = new Set(sessionMuscles);
 
   let muscleRelevance = 0;
   for (const muscle of exercise.primaryMuscles as CanonicalMuscleGroup[]) {
-    if (sessionMuscleSet.has(muscle)) muscleRelevance += weeklyVolumeTargets[muscle] * 1.0;
+    if (sessionMuscleSet.has(muscle)) muscleRelevance += weeklyVolumeTargets[muscle] * MUSCLE_ROLE_WEIGHTS.PRIMARY;
   }
   for (const muscle of exercise.secondaryMuscles as CanonicalMuscleGroup[]) {
-    if (sessionMuscleSet.has(muscle)) muscleRelevance += weeklyVolumeTargets[muscle] * 0.3;
+    if (sessionMuscleSet.has(muscle)) muscleRelevance += weeklyVolumeTargets[muscle] * MUSCLE_ROLE_WEIGHTS.SECONDARY;
   }
 
   const hypertrophyScore = exercise.hypertrophyScore ?? 5;
@@ -93,7 +108,14 @@ function scoreExercise(
   const QUALITY_WEIGHT = 2.0;
   const FATIGUE_WEIGHT = 1.0;
 
-  return muscleRelevance * MUSCLE_WEIGHT + quality * QUALITY_WEIGHT - fatigue * FATIGUE_WEIGHT;
+  const relationshipRelevance = relatedExerciseIds?.has(exercise.id) ? RELATIONSHIP_BONUS : 0;
+
+  return (
+    muscleRelevance * MUSCLE_WEIGHT +
+    quality * QUALITY_WEIGHT -
+    fatigue * FATIGUE_WEIGHT +
+    relationshipRelevance
+  );
 }
 
 function repRangeForBias(trainingBias: TrainingBias): { min: number; max: number } {
@@ -114,13 +136,21 @@ export function allocateSession(input: {
   weeklyVolumeTargets: Record<CanonicalMuscleGroup, number>;
   trainingBias: TrainingBias;
   sessionDurationMinutes: number;
+  /** Ids from exercises.getRelatedExerciseIds(db, referenceExerciseId) — resolved by the caller, kept out of this pure function. */
+  relatedExerciseIds?: Set<string>;
 }): AllocatedExercise[] {
   const sessionMuscles = SESSION_MUSCLE_MAP[input.sessionLabel];
 
   const scored = input.candidates
     .map((exercise) => ({
       exercise,
-      score: scoreExercise(exercise, sessionMuscles, input.weeklyVolumeTargets, input.trainingBias),
+      score: scoreExercise(
+        exercise,
+        sessionMuscles,
+        input.weeklyVolumeTargets,
+        input.trainingBias,
+        input.relatedExerciseIds,
+      ),
     }))
     .sort((a, b) => b.score - a.score || a.exercise.canonicalId.localeCompare(b.exercise.canonicalId));
 

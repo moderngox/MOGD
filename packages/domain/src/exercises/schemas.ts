@@ -5,6 +5,7 @@ import {
   MOVEMENT_PATTERN_OPTIONS,
   EXERCISE_DIFFICULTY_OPTIONS,
   ASSET_TYPE_OPTIONS,
+  RELATIONSHIP_ACTION_OPTIONS,
 } from "./options";
 
 /**
@@ -56,3 +57,16 @@ export const createDraftAssetInput = z.object({
   generationModel: z.string().trim().max(120).optional(),
 });
 export type CreateDraftAssetInput = z.infer<typeof createDraftAssetInput>;
+
+/**
+ * Self-relation is deliberately NOT rejected here (unlike shape validation)
+ * — it's business-rule state, not input shape, so relationships.ts throws
+ * a dedicated SelfReferentialRelationshipError for it, matching how
+ * createExercise checks canonicalId uniqueness outside this schema.
+ */
+export const createRelationshipInput = z.object({
+  exerciseId: z.string().min(1),
+  relatedExerciseId: z.string().min(1),
+  action: z.enum(RELATIONSHIP_ACTION_OPTIONS),
+});
+export type CreateRelationshipInput = z.infer<typeof createRelationshipInput>;

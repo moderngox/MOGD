@@ -45,3 +45,21 @@ export type AssetType = (typeof ASSET_TYPE_OPTIONS)[number];
 
 export const ASSET_STATUS_OPTIONS = ["draft", "approved", "archived"] as const;
 export type AssetStatus = (typeof ASSET_STATUS_OPTIONS)[number];
+
+/**
+ * docs/01_EXERCISE_RELATIONSHIPS_ARCHITECTURE.md §2. Only these three are
+ * ever persisted (packages/db/src/schema/exerciseRelationships.ts) —
+ * "regression" is deliberately excluded here and only exists as a
+ * RelationshipAction below (see relationships.ts for the swap it performs).
+ */
+export const RELATIONSHIP_TYPE_OPTIONS = ["progression", "variation", "alternative"] as const;
+export type RelationshipType = (typeof RELATIONSHIP_TYPE_OPTIONS)[number];
+
+/** What the admin UI/API accepts — "regression" is sugar, never stored as-is. */
+export const RELATIONSHIP_ACTION_OPTIONS = [
+  "progression",
+  "regression",
+  "variation",
+  "alternative",
+] as const;
+export type RelationshipAction = (typeof RELATIONSHIP_ACTION_OPTIONS)[number];

@@ -144,6 +144,28 @@ describe("allocateSession", () => {
     }
   });
 
+  it("prefers a candidate that is a known relationship of the reference exercise", () => {
+    const related = mockExercise({
+      canonicalId: "related_exercise",
+      primaryMuscles: ["upper_chest"] as CanonicalMuscleGroup[],
+    });
+    const unrelated = mockExercise({
+      canonicalId: "unrelated_exercise",
+      primaryMuscles: ["upper_chest"] as CanonicalMuscleGroup[],
+    });
+
+    const result = allocateSession({
+      sessionLabel: "push",
+      candidates: [unrelated, related],
+      weeklyVolumeTargets: { upper_chest: 14 } as Record<CanonicalMuscleGroup, number>,
+      trainingBias: { hypertrophy: 0.75, strength: 0.25 },
+      sessionDurationMinutes: 30,
+      relatedExerciseIds: new Set([related.id]),
+    });
+
+    expect(result[0]?.canonicalId).toBe("related_exercise");
+  });
+
   it("is deterministic: identical inputs produce identical output", () => {
     const candidates = Array.from({ length: 5 }, (_, i) =>
       mockExercise({ canonicalId: `ex_${i}`, primaryMuscles: ["upper_chest"] as CanonicalMuscleGroup[] }),

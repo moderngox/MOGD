@@ -22,3 +22,15 @@ export {
   AssetNotFoundError,
 } from "./assetService";
 export { getCatalogStats, type CatalogStats } from "./catalogStats";
+export {
+  createExerciseRelationship,
+  deleteRelationship,
+  getExerciseRelationships,
+  getRelatedExerciseIds,
+  SelfReferentialRelationshipError,
+  DuplicateRelationshipError,
+  ExerciseNotFoundError,
+  RelationshipNotFoundError,
+  type RelatedExercise,
+  type ExerciseRelationshipsView,
+} from "./relationships";

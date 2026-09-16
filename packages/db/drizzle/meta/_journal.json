@@ -57,6 +57,13 @@
       "when": 1788909452916,
       "tag": "0007_trainingcontext_to_array",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1789559215501,
+      "tag": "0008_exercise_relationships",
+      "breakpoints": true
     }
   ]
 }

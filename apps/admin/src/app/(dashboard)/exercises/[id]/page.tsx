@@ -4,6 +4,7 @@ import { getDb } from "@mogd/db";
 import { exercises } from "@mogd/domain";
 import { Badge, Button } from "@mogd/ui";
 import { ExerciseForm } from "../ExerciseForm";
+import { RelationshipsSection } from "./RelationshipsSection";
 
 export default async function EditExercisePage({
   params,
@@ -11,8 +12,14 @@ export default async function EditExercisePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const exercise = await exercises.getExerciseById(getDb(), id);
+  const db = getDb();
+  const exercise = await exercises.getExerciseById(db, id);
   if (!exercise) notFound();
+
+  const [relationships, allExercises] = await Promise.all([
+    exercises.getExerciseRelationships(db, id),
+    exercises.listExercises(db),
+  ]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -47,6 +54,11 @@ export default async function EditExercisePage({
           instructions: exercise.instructions ?? undefined,
           isActive: exercise.isActive,
         }}
+      />
+      <RelationshipsSection
+        exerciseId={exercise.id}
+        relationships={relationships}
+        allExercises={allExercises.map((e) => ({ id: e.id, name: e.name, canonicalId: e.canonicalId }))}
       />
     </div>
   );
