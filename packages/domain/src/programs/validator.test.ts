@@ -54,6 +54,7 @@ describe("validateProgram", () => {
               repMax: 12,
               rir: 2,
               restSeconds: 90,
+              sessionRole: "primary",
             },
           ],
         },

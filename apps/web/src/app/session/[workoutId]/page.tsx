@@ -52,6 +52,7 @@ export default async function SessionPage({
       repMax: exercise.repMax,
       rir: exercise.rir,
       restSeconds: exercise.restSeconds,
+      sessionRole: exercise.sessionRole,
       selectionReason: exercise.selectionReason,
       videoUrl:
         env && exercise.videoObjectKey

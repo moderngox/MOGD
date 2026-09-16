@@ -3,6 +3,7 @@ import { schema, type Database } from "@mogd/db";
 import { getPublishedAsset } from "../exercises/assetService";
 import { explainExerciseSelection } from "../training/explainSelection";
 import type { SessionLabel } from "../training/splitTemplates";
+import type { SessionRole } from "../training/sessionAllocation";
 
 export interface ProgramWorkoutExerciseView {
   workoutExerciseId: string;
@@ -16,6 +17,8 @@ export interface ProgramWorkoutExerciseView {
   repMax: number;
   rir: number;
   restSeconds: number;
+  /** Null for workouts generated before this field existed (see schema). */
+  sessionRole: SessionRole | null;
   videoObjectKey: string | null;
   selectionReason: string;
 }
@@ -60,6 +63,7 @@ export async function getCurrentProgram(db: Database, userId: string): Promise<P
         repMax: schema.workoutExercises.repMax,
         rir: schema.workoutExercises.rir,
         restSeconds: schema.workoutExercises.restSeconds,
+        sessionRole: schema.workoutExercises.sessionRole,
         canonicalId: schema.exercises.canonicalId,
         name: schema.exercises.name,
         instructions: schema.exercises.instructions,
@@ -129,6 +133,7 @@ export async function getWorkout(db: Database, workoutId: string): Promise<Progr
       repMax: schema.workoutExercises.repMax,
       rir: schema.workoutExercises.rir,
       restSeconds: schema.workoutExercises.restSeconds,
+      sessionRole: schema.workoutExercises.sessionRole,
       canonicalId: schema.exercises.canonicalId,
       name: schema.exercises.name,
       instructions: schema.exercises.instructions,

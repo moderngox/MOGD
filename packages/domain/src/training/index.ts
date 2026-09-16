@@ -10,7 +10,9 @@ export {
   MINUTES_PER_SET,
   MIN_SETS_PER_EXERCISE,
   MAX_SETS_PER_EXERCISE,
+  SESSION_ROLE_OPTIONS,
   type AllocatedExercise,
+  type SessionRole,
 } from "./sessionAllocation";
 export { computeProgressionTarget, type ProgressionInput, type ProgressionTarget } from "./progression";
 export { explainExerciseSelection } from "./explainSelection";

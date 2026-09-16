@@ -57,6 +57,11 @@ export const workoutExercises = sqliteTable("workout_exercise", {
   repMax: integer("repMax").notNull(),
   rir: integer("rir").notNull(),
   restSeconds: integer("restSeconds").notNull(),
+  // Nullable, not backfilled: rows generated before this field existed
+  // simply have no role (see packages/domain/src/training/sessionAllocation.ts).
+  sessionRole: text("sessionRole", {
+    enum: ["primary", "accessory", "superset", "finisher", "warmup"],
+  }),
 });
 
 /**

@@ -166,6 +166,46 @@ describe("allocateSession", () => {
     expect(result[0]?.canonicalId).toBe("related_exercise");
   });
 
+  it("assigns 'primary' to the only exercise in a 1-exercise session", () => {
+    const only = mockExercise({ primaryMuscles: ["upper_chest"] as CanonicalMuscleGroup[] });
+    const result = allocateSession({
+      sessionLabel: "push",
+      candidates: [only],
+      weeklyVolumeTargets: { upper_chest: 14 } as Record<CanonicalMuscleGroup, number>,
+      trainingBias: { hypertrophy: 0.75, strength: 0.25 },
+      sessionDurationMinutes: 30,
+    });
+    expect(result.map((e) => e.sessionRole)).toEqual(["primary"]);
+  });
+
+  it("assigns 'primary' and 'finisher' in a 2-exercise session, no 'accessory'", () => {
+    const candidates = Array.from({ length: 2 }, (_, i) =>
+      mockExercise({ canonicalId: `ex_${i}`, primaryMuscles: ["upper_chest"] as CanonicalMuscleGroup[] }),
+    );
+    const result = allocateSession({
+      sessionLabel: "push",
+      candidates,
+      weeklyVolumeTargets: { upper_chest: 14 } as Record<CanonicalMuscleGroup, number>,
+      trainingBias: { hypertrophy: 0.75, strength: 0.25 },
+      sessionDurationMinutes: 30,
+    });
+    expect(result.map((e) => e.sessionRole)).toEqual(["primary", "finisher"]);
+  });
+
+  it("assigns 'primary' first, 'finisher' last, and 'accessory' in between for 3+ exercises", () => {
+    const candidates = Array.from({ length: 3 }, (_, i) =>
+      mockExercise({ canonicalId: `ex_${i}`, primaryMuscles: ["upper_chest"] as CanonicalMuscleGroup[] }),
+    );
+    const result = allocateSession({
+      sessionLabel: "push",
+      candidates,
+      weeklyVolumeTargets: { upper_chest: 14 } as Record<CanonicalMuscleGroup, number>,
+      trainingBias: { hypertrophy: 0.75, strength: 0.25 },
+      sessionDurationMinutes: 30,
+    });
+    expect(result.map((e) => e.sessionRole)).toEqual(["primary", "accessory", "finisher"]);
+  });
+
   it("is deterministic: identical inputs produce identical output", () => {
     const candidates = Array.from({ length: 5 }, (_, i) =>
       mockExercise({ canonicalId: `ex_${i}`, primaryMuscles: ["upper_chest"] as CanonicalMuscleGroup[] }),

@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Input } from "@mogd/ui";
+import { Badge, Button, Input } from "@mogd/ui";
+import type { BadgeVariant } from "@mogd/ui";
 import { logSetAction } from "./actions";
 
 export interface SessionExerciseView {
@@ -14,6 +15,7 @@ export interface SessionExerciseView {
   repMax: number;
   rir: number;
   restSeconds: number;
+  sessionRole: string | null;
   selectionReason: string;
   videoUrl: string | null;
   previousPerformance: { loadKg: number | null; reps: number } | null;
@@ -30,6 +32,14 @@ interface LoggedSet {
   loadKg?: number;
   reps: number;
 }
+
+/** "accessory" is the unmarked default — no badge for it, to avoid a badge on every card. */
+const SESSION_ROLE_BADGES: Record<string, { label: string; variant: BadgeVariant }> = {
+  primary: { label: "Primary", variant: "current" },
+  finisher: { label: "Finisher", variant: "warning" },
+  superset: { label: "Superset", variant: "info" },
+  warmup: { label: "Warm-up", variant: "neutral" },
+};
 
 function ExerciseCard({
   exercise,
@@ -74,10 +84,15 @@ function ExerciseCard({
     }
   }
 
+  const roleBadge = exercise.sessionRole ? SESSION_ROLE_BADGES[exercise.sessionRole] : undefined;
+
   return (
     <div className="flex flex-col gap-3 rounded-md border border-zinc-800 p-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-medium">{exercise.name}</h2>
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg font-medium">{exercise.name}</h2>
+          {roleBadge && <Badge variant={roleBadge.variant}>{roleBadge.label}</Badge>}
+        </div>
         <span className="text-sm text-zinc-500">
           {exercise.sets} × {exercise.repMin}-{exercise.repMax} · RIR {exercise.rir} ·{" "}
           {exercise.restSeconds}s rest

@@ -5,6 +5,7 @@ import { schema, type Database } from "@mogd/db";
 import { createExercise } from "../exercises/exerciseCatalog";
 import { generateStrategyAndNutrition } from "../nutrition/generateStrategy";
 import { generateProgram, StrategyIncompleteError } from "./generateProgram";
+import { SESSION_ROLE_OPTIONS } from "../training/sessionAllocation";
 import type { CreateExerciseInput } from "../exercises/schemas";
 
 const CATALOG: CreateExerciseInput[] = [
@@ -147,6 +148,30 @@ describe("generateProgram", () => {
     for (const we of workoutExercises) {
       expect(we.sets).toBeGreaterThanOrEqual(2);
       expect(we.sets).toBeLessThanOrEqual(5);
+      expect(SESSION_ROLE_OPTIONS).toContain(we.sessionRole);
+    }
+  });
+
+  it("persists 'primary' on the first exercise and 'finisher' on the last, per workout", async () => {
+    const userId = await seedUser(db);
+    await generateStrategyAndNutrition(db, userId);
+    await generateProgram(db, userId);
+
+    const workouts = await db.select().from(schema.workouts);
+    for (const workout of workouts) {
+      const exercises = await db
+        .select()
+        .from(schema.workoutExercises)
+        .where(eq(schema.workoutExercises.workoutId, workout.id))
+        .orderBy(schema.workoutExercises.orderIndex);
+
+      expect(exercises[0]?.sessionRole).toBe("primary");
+      if (exercises.length > 1) {
+        expect(exercises.at(-1)?.sessionRole).toBe("finisher");
+      }
+      for (const middle of exercises.slice(1, -1)) {
+        expect(middle.sessionRole).toBe("accessory");
+      }
     }
   });
 

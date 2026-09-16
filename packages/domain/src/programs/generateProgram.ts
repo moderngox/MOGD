@@ -129,6 +129,7 @@ export async function generateProgram(db: Database, userId: string): Promise<Gen
           repMax: exercise.repMax,
           rir: exercise.rir,
           restSeconds: exercise.restSeconds,
+          sessionRole: exercise.sessionRole,
         });
       }
     }
