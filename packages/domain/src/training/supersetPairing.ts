@@ -1,21 +1,16 @@
 import type { SessionRole } from "../exercises/options";
 import type { CatalogExercise } from "./candidatePool";
 import type { RoleAssignment } from "./sessionRoleAssignment";
+import type { RoleRules } from "./roleRules";
 
 /**
  * Superset pairing (docs/MOGD_06-session-role-architecture.md §2, §10, §11): a
  * superset is exactly two exercises done back to back, so it is decided by a
  * pairing pass over the whole session, never assigned to one exercise on its
  * own. The spec leaves "when" and "compatible" open, so the rules below are
- * explicit; the constants are illustrative starting points like this
- * codebase's other role constants, not tuned physiology.
+ * explicit; the numbers (fatigue ceilings, pair limit) come from the
+ * configurable RoleRules (training/roleRules.ts), not from this file.
  */
-
-/** "fatigue_budget: controlled" (§2): neither member may be a heavy fatiguer. */
-export const SUPERSET_MEMBER_FATIGUE_CEILING = 6;
-/** Two controlled movements back to back still shouldn't add up to a heavy block. */
-export const SUPERSET_COMBINED_FATIGUE_CEILING = 10;
-export const MAX_SUPERSET_PAIRS_PER_SESSION = 1;
 
 export type SupersetExercise = Pick<
   CatalogExercise,
@@ -37,13 +32,13 @@ export function allowsSuperset(exercise: Pick<CatalogExercise, "allowedSessionRo
  * (a preference for another role is a bias to respect, so it isn't pulled in),
  * and it is within the member fatigue ceiling.
  */
-export function isSupersetCandidate(exercise: SupersetExercise, baseRole: SessionRole): boolean {
+export function isSupersetCandidate(exercise: SupersetExercise, baseRole: SessionRole, rules: RoleRules): boolean {
   const preferred = exercise.preferredSessionRole as SessionRole | null;
   return (
     baseRole === "accessory" &&
     allowsSuperset(exercise) &&
     (preferred === null || preferred === "superset") &&
-    (exercise.fatigueScore ?? 0) <= SUPERSET_MEMBER_FATIGUE_CEILING
+    (exercise.fatigueScore ?? 0) <= rules.superset.memberFatigueCeiling
   );
 }
 
@@ -59,13 +54,13 @@ export function supersetSetBounds(a: PairOperand, b: PairOperand): { min: number
  * (primaries disjoint, and neither's primary is the other's secondary), their
  * combined fatigue stays under the ceiling, and they can share a set count.
  */
-export function areSupersetCompatible(a: PairOperand, b: PairOperand): boolean {
+export function areSupersetCompatible(a: PairOperand, b: PairOperand, rules: RoleRules): boolean {
   const aPrimary = new Set<string>(a.primaryMuscles);
   const bPrimary = new Set<string>(b.primaryMuscles);
   if ([...aPrimary].some((m) => bPrimary.has(m))) return false;
   if (a.secondaryMuscles.some((m) => bPrimary.has(m)) || b.secondaryMuscles.some((m) => aPrimary.has(m))) return false;
 
-  if ((a.fatigueScore ?? 0) + (b.fatigueScore ?? 0) > SUPERSET_COMBINED_FATIGUE_CEILING) return false;
+  if ((a.fatigueScore ?? 0) + (b.fatigueScore ?? 0) > rules.superset.combinedFatigueCeiling) return false;
 
   return supersetSetBounds(a, b) !== null;
 }
@@ -79,7 +74,7 @@ export interface PairingResult<T> {
 }
 
 /**
- * Forms at most MAX_SUPERSET_PAIRS_PER_SESSION pairs from the already
+ * Forms at most the configured maximum number of pairs from the already
  * role-assigned selection. A pair forms only if at least one member PREFERS
  * superset — admin intent is the trigger, so nothing nobody marked is ever
  * silently paired and unconfigured programs are unchanged. Among candidates
@@ -90,16 +85,17 @@ export interface PairingResult<T> {
 export function pairSupersets<T extends { exercise: SupersetExercise }>(
   selected: T[],
   roles: RoleAssignment[],
+  rules: RoleRules,
 ): PairingResult<T> {
   type Slot = { item: T; role: RoleAssignment; group: number | null };
   let slots: Slot[] = selected.map((item, i) => ({ item, role: roles[i]!, group: null }));
 
   const prefersSuperset = (s: Slot) => (s.item.exercise.preferredSessionRole as SessionRole | null) === "superset";
 
-  for (let pair = 0; pair < MAX_SUPERSET_PAIRS_PER_SESSION; pair++) {
+  for (let pair = 0; pair < rules.superset.maxPairsPerSession; pair++) {
     const candidates = slots
       .map((slot, index) => ({ slot, index }))
-      .filter(({ slot }) => slot.group === null && isSupersetCandidate(slot.item.exercise, slot.role.role));
+      .filter(({ slot }) => slot.group === null && isSupersetCandidate(slot.item.exercise, slot.role.role, rules));
 
     let best: { i: number; j: number; preferring: number } | null = null;
     for (let a = 0; a < candidates.length; a++) {
@@ -108,7 +104,7 @@ export function pairSupersets<T extends { exercise: SupersetExercise }>(
         const second = candidates[b]!;
         const preferring = Number(prefersSuperset(first.slot)) + Number(prefersSuperset(second.slot));
         if (preferring === 0) continue;
-        if (!areSupersetCompatible(first.slot.item.exercise, second.slot.item.exercise)) continue;
+        if (!areSupersetCompatible(first.slot.item.exercise, second.slot.item.exercise, rules)) continue;
         if (best === null || preferring > best.preferring) best = { i: first.index, j: second.index, preferring };
       }
     }

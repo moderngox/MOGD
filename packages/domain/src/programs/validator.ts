@@ -3,12 +3,11 @@ import type { Equipment, ExperienceLevel } from "../assessment/options";
 import { resolveActiveExercise } from "../exercises/exerciseCatalog";
 import { listProgrammingProfiles, resolveApplicableProfile } from "../exercises/programmingProfiles";
 import { MINUTES_PER_SET } from "../training/sessionAllocation";
-import { FINISHER_FATIGUE_CEILING, MAX_MAIN_SLOTS_PER_SESSION } from "../training/sessionRoleAssignment";
+import type { RoleRules } from "../training/roleRules";
+import { getRoleRulesRevision } from "../training/roleRulesStore";
 import {
   allowsSuperset,
   areSupersetCompatible,
-  MAX_SUPERSET_PAIRS_PER_SESSION,
-  SUPERSET_MEMBER_FATIGUE_CEILING,
   type SupersetExercise,
 } from "../training/supersetPairing";
 import type { SessionLabel } from "../training/splitTemplates";
@@ -25,6 +24,8 @@ export interface ProgramPlan {
   sessionDurationMinutes: number;
   equipment: Equipment[];
   experienceLevel: ExperienceLevel;
+  /** The role-rules revision the plan was built under (null = built-in defaults); the validator re-reads it itself. */
+  roleRulesRevisionId: string | null;
   workouts: ProgramWorkoutPlan[];
 }
 
@@ -47,6 +48,7 @@ const DURATION_UNDERSHOOT_FLOOR = 0.5;
 function validateSupersets(
   workout: ProgramWorkoutPlan,
   resolvedByOrder: Map<number, SupersetExercise>,
+  rules: RoleRules,
   reasons: string[],
 ): void {
   const day = `Day ${workout.dayIndex}`;
@@ -65,8 +67,8 @@ function validateSupersets(
     groups.set(exercise.supersetGroupIndex, [...(groups.get(exercise.supersetGroupIndex) ?? []), exercise]);
   }
 
-  if (groups.size > MAX_SUPERSET_PAIRS_PER_SESSION) {
-    reasons.push(`${day} has ${groups.size} supersets, over the limit of ${MAX_SUPERSET_PAIRS_PER_SESSION}.`);
+  if (groups.size > rules.superset.maxPairsPerSession) {
+    reasons.push(`${day} has ${groups.size} supersets, over the limit of ${rules.superset.maxPairsPerSession}.`);
   }
 
   for (const members of groups.values()) {
@@ -86,11 +88,11 @@ function validateSupersets(
 
     for (const [exercise, resolved] of [[a, resolvedA], [b, resolvedB]] as const) {
       if (!allowsSuperset(resolved)) reasons.push(`${day}: "${exercise.canonicalId}" is not eligible for superset.`);
-      if ((resolved.fatigueScore ?? 0) > SUPERSET_MEMBER_FATIGUE_CEILING) {
+      if ((resolved.fatigueScore ?? 0) > rules.superset.memberFatigueCeiling) {
         reasons.push(`${day}: "${exercise.canonicalId}" is too fatiguing for a superset.`);
       }
     }
-    if (!areSupersetCompatible(resolvedA, resolvedB)) reasons.push(`${day}: superset ${label} isn't compatible.`);
+    if (!areSupersetCompatible(resolvedA, resolvedB, rules)) reasons.push(`${day}: superset ${label} isn't compatible.`);
   }
 }
 
@@ -104,6 +106,7 @@ function validateSupersets(
  */
 export async function validateProgram(db: Database, plan: ProgramPlan): Promise<ValidationResult> {
   const reasons: string[] = [];
+  const rules = await getRoleRulesRevision(db, plan.roleRulesRevisionId);
 
   if (plan.workouts.length !== plan.sessionsPerWeek) {
     reasons.push(
@@ -120,8 +123,8 @@ export async function validateProgram(db: Database, plan: ProgramPlan): Promise<
     }
 
     const mainCount = workout.exercises.filter((e) => e.sessionRole === "main").length;
-    if (mainCount > MAX_MAIN_SLOTS_PER_SESSION) {
-      reasons.push(`Day ${workout.dayIndex} has ${mainCount} main exercises, over the limit of ${MAX_MAIN_SLOTS_PER_SESSION}.`);
+    if (mainCount > rules.maxMainSlots) {
+      reasons.push(`Day ${workout.dayIndex} has ${mainCount} main exercises, over the limit of ${rules.maxMainSlots}.`);
     }
 
     const estimatedMinutes = workout.exercises.reduce((sum, e) => sum + e.sets * MINUTES_PER_SET, 0);
@@ -173,7 +176,7 @@ export async function validateProgram(db: Database, plan: ProgramPlan): Promise<
       if (!allowedRoles.includes(exercise.sessionRole)) {
         reasons.push(`"${exercise.canonicalId}" was assigned role "${exercise.sessionRole}", which it is not eligible for.`);
       }
-      if (exercise.sessionRole === "finisher" && (resolved.fatigueScore ?? 0) > FINISHER_FATIGUE_CEILING) {
+      if (exercise.sessionRole === "finisher" && (resolved.fatigueScore ?? 0) > rules.finisherFatigueCeiling) {
         reasons.push(`"${exercise.canonicalId}" is too fatiguing to be a finisher.`);
       }
 
@@ -190,7 +193,7 @@ export async function validateProgram(db: Database, plan: ProgramPlan): Promise<
       if (profile) checked.set(exercise.orderIndex, { ...resolved, programmingProfile: profile });
     }
 
-    validateSupersets(workout, checked, reasons);
+    validateSupersets(workout, checked, rules, reasons);
   }
 
   return { valid: reasons.length === 0, reasons };

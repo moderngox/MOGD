@@ -6,6 +6,7 @@ import { SESSION_MUSCLE_MAP } from "./splitTemplates";
 import type { EligibleExercise } from "./candidatePool";
 import { assignRole, assignSessionRoles, applyRoleModifier } from "./sessionRoleAssignment";
 import { pairSupersets, supersetSetBounds } from "./supersetPairing";
+import type { RoleRules } from "./roleRules";
 import type { RoleReason } from "./sessionRoleAssignment";
 
 export interface AllocatedExercise {
@@ -137,6 +138,8 @@ export function allocateSession(input: {
   weeklyVolumeTargets: Record<CanonicalMuscleGroup, number>;
   trainingBias: TrainingBias;
   sessionDurationMinutes: number;
+  /** The configurable role numbers (training/roleRules.ts) — required so no caller can ignore admin config. */
+  roleRules: RoleRules;
   /** Ids from exercises.getRelatedExerciseIds(db, referenceExerciseId) — resolved by the caller, kept out of this pure function. */
   relatedExerciseIds?: Set<string>;
 }): AllocatedExercise[] {
@@ -166,14 +169,14 @@ export function allocateSession(input: {
   const probeState = { mainSlotsFilled: 0 };
   for (const candidate of scored) {
     if (selected.length >= targetCount) break;
-    if (assignRole(candidate.exercise, probeState, false)) selected.push(candidate);
+    if (assignRole(candidate.exercise, probeState, false, input.roleRules)) selected.push(candidate);
   }
 
   const minSetsFloor = selected.reduce((sum, s) => sum + s.exercise.programmingProfile.setsMin, 0);
   const totalSetBudget = Math.max(minSetsFloor, Math.round(input.sessionDurationMinutes / MINUTES_PER_SET));
   const totalRelevance = selected.reduce((sum, s) => sum + Math.max(s.score, 0.01), 0);
 
-  const paired = pairSupersets(selected, assignSessionRoles(selected));
+  const paired = pairSupersets(selected, assignSessionRoles(selected, input.roleRules), input.roleRules);
   const ordered = paired.selected;
   const roles = paired.roles;
 
@@ -206,7 +209,7 @@ export function allocateSession(input: {
       restSeconds,
     };
     const { role, roleReason } = roles[index]!;
-    const contextual = applyRoleModifier(baseline, role, { min: profile.setsMin, max: profile.setsMax });
+    const contextual = applyRoleModifier(baseline, role, { min: profile.setsMin, max: profile.setsMax }, input.roleRules);
 
     return {
       exerciseId: s.exercise.id,

@@ -6,6 +6,7 @@ import { selectSplit } from "../training/splitTemplates";
 import { deriveWeeklyVolumeTargets } from "../training/volumeTargets";
 import { getExerciseCandidates } from "../training/candidatePool";
 import { allocateSession, MINUTES_PER_SET } from "../training/sessionAllocation";
+import { getCurrentRoleRules, RoleRulesInvalidError } from "../training/roleRulesStore";
 import { validateProgram, type ProgramPlan, type ProgramWorkoutPlan } from "./validator";
 
 export class StrategyIncompleteError extends Error {
@@ -43,6 +44,15 @@ export async function generateProgram(db: Database, userId: string): Promise<Gen
     throw new StrategyIncompleteError(userId);
   }
 
+  // Invalid persisted rules reject generation explicitly — never a silent fallback to defaults.
+  let roleRules: Awaited<ReturnType<typeof getCurrentRoleRules>>;
+  try {
+    roleRules = await getCurrentRoleRules(db);
+  } catch (error) {
+    if (error instanceof RoleRulesInvalidError) return { success: false, reasons: [error.message] };
+    throw error;
+  }
+
   const experienceLevel = training.experienceLevel as ExperienceLevel;
   const equipment = training.equipment as Equipment[];
 
@@ -63,6 +73,7 @@ export async function generateProgram(db: Database, userId: string): Promise<Gen
       weeklyVolumeTargets,
       trainingBias: strategy.trainingBias,
       sessionDurationMinutes: training.sessionDurationMinutes,
+      roleRules: roleRules.rules,
     });
     workouts.push({ dayIndex, sessionLabel, exercises });
   }
@@ -72,6 +83,7 @@ export async function generateProgram(db: Database, userId: string): Promise<Gen
     sessionDurationMinutes: training.sessionDurationMinutes,
     equipment,
     experienceLevel,
+    roleRulesRevisionId: roleRules.revisionId,
     workouts,
   };
 
@@ -91,7 +103,12 @@ export async function generateProgram(db: Database, userId: string): Promise<Gen
       programId = existing.id;
       await tx
         .update(schema.programs)
-        .set({ splitType, sessionsPerWeek: training.sessionsPerWeek, updatedAt: new Date() })
+        .set({
+          splitType,
+          sessionsPerWeek: training.sessionsPerWeek,
+          roleRulesRevisionId: roleRules.revisionId,
+          updatedAt: new Date(),
+        })
         .where(eq(schema.programs.id, programId));
       // An open workout whose slot is about to disappear can't be resumed —
       // close it out as abandoned. Its performances and prescription
@@ -105,7 +122,12 @@ export async function generateProgram(db: Database, userId: string): Promise<Gen
     } else {
       const [created] = await tx
         .insert(schema.programs)
-        .values({ userId, splitType, sessionsPerWeek: training.sessionsPerWeek })
+        .values({
+          userId,
+          splitType,
+          sessionsPerWeek: training.sessionsPerWeek,
+          roleRulesRevisionId: roleRules.revisionId,
+        })
         .returning({ id: schema.programs.id });
       programId = created!.id;
     }

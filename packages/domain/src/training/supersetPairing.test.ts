@@ -1,14 +1,29 @@
 import { describe, expect, it } from "vitest";
 import {
-  areSupersetCompatible,
-  isSupersetCandidate,
-  MAX_SUPERSET_PAIRS_PER_SESSION,
-  pairSupersets,
-  SUPERSET_COMBINED_FATIGUE_CEILING,
-  SUPERSET_MEMBER_FATIGUE_CEILING,
+  areSupersetCompatible as areSupersetCompatibleWith,
+  isSupersetCandidate as isSupersetCandidateWith,
+  pairSupersets as pairSupersetsWith,
   supersetSetBounds,
   type SupersetExercise,
 } from "./supersetPairing";
+import { DEFAULT_ROLE_RULES, type RoleRules } from "./roleRules";
+
+const SUPERSET_MEMBER_FATIGUE_CEILING = DEFAULT_ROLE_RULES.superset.memberFatigueCeiling;
+const SUPERSET_COMBINED_FATIGUE_CEILING = DEFAULT_ROLE_RULES.superset.combinedFatigueCeiling;
+const MAX_SUPERSET_PAIRS_PER_SESSION = DEFAULT_ROLE_RULES.superset.maxPairsPerSession;
+
+const isSupersetCandidate = (e: SupersetExercise, role: Parameters<typeof isSupersetCandidateWith>[1], rules: RoleRules = DEFAULT_ROLE_RULES) =>
+  isSupersetCandidateWith(e, role, rules);
+const areSupersetCompatible = (
+  a: Parameters<typeof areSupersetCompatibleWith>[0],
+  b: Parameters<typeof areSupersetCompatibleWith>[1],
+  rules: RoleRules = DEFAULT_ROLE_RULES,
+) => areSupersetCompatibleWith(a, b, rules);
+const pairSupersets = <T extends { exercise: SupersetExercise }>(
+  selected: T[],
+  roles: Parameters<typeof pairSupersetsWith>[1],
+  rules: RoleRules = DEFAULT_ROLE_RULES,
+) => pairSupersetsWith(selected, roles, rules);
 import type { RoleAssignment } from "./sessionRoleAssignment";
 
 function exercise(overrides: Partial<SupersetExercise> = {}): SupersetExercise {
@@ -220,4 +235,42 @@ describe("pairSupersets", () => {
     const roles = [accessory, accessory, accessory];
     expect(pairSupersets(items, roles)).toEqual(pairSupersets(items, roles));
   });
+
+describe("custom role rules", () => {
+  const rules = (superset: Partial<RoleRules["superset"]>): RoleRules => ({
+    ...DEFAULT_ROLE_RULES,
+    superset: { ...DEFAULT_ROLE_RULES.superset, ...superset },
+  });
+
+  it("a lower member fatigue ceiling removes candidates", () => {
+    const e = exercise({ fatigueScore: 3 });
+    expect(isSupersetCandidate(e, "accessory")).toBe(true);
+    expect(isSupersetCandidate(e, "accessory", rules({ memberFatigueCeiling: 2 }))).toBe(false);
+  });
+
+  it("the combined ceiling changes which pairs are compatible", () => {
+    const a = exercise({ fatigueScore: 5 });
+    const b = exercise({ ...TRICEPS, fatigueScore: 5 });
+    expect(areSupersetCompatible(a, b)).toBe(true);
+    expect(areSupersetCompatible(a, b, rules({ combinedFatigueCeiling: 9 }))).toBe(false);
+  });
+
+  it("maxPairsPerSession: 0 disables supersets entirely", () => {
+    const items = session(exercise({ preferredSessionRole: "superset" }), exercise(TRICEPS));
+    const result = pairSupersets(items, [accessory, accessory], rules({ maxPairsPerSession: 0 }));
+    expect(result.groupIndexes).toEqual([null, null]);
+  });
+
+  it("maxPairsPerSession: 2 forms two separate pairs", () => {
+    const items = session(
+      exercise({ primaryMuscles: ["biceps"], preferredSessionRole: "superset" }),
+      exercise({ primaryMuscles: ["triceps"], preferredSessionRole: "superset" }),
+      exercise({ primaryMuscles: ["lats"], preferredSessionRole: "superset" }),
+      exercise({ primaryMuscles: ["quadriceps"], preferredSessionRole: "superset" }),
+    );
+    const result = pairSupersets(items, [accessory, accessory, accessory, accessory], rules({ maxPairsPerSession: 2 }));
+    expect(new Set(result.groupIndexes.filter((g) => g !== null))).toEqual(new Set([0, 1]));
+    expect(result.roles.filter((r) => r.role === "superset")).toHaveLength(4);
+  });
+});
 });

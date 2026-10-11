@@ -1,6 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { assignSessionRoles, applyRoleModifier, UnassignableRoleError } from "./sessionRoleAssignment";
+import {
+  assignSessionRoles as assignSessionRolesWith,
+  applyRoleModifier as applyRoleModifierWith,
+  UnassignableRoleError,
+} from "./sessionRoleAssignment";
+import { DEFAULT_ROLE_RULES, type RoleRules } from "./roleRules";
 import type { CatalogExercise } from "./candidatePool";
+
+const assignSessionRoles = (selected: Parameters<typeof assignSessionRolesWith>[0], rules: RoleRules = DEFAULT_ROLE_RULES) =>
+  assignSessionRolesWith(selected, rules);
+const applyRoleModifier = (
+  baseline: Parameters<typeof applyRoleModifierWith>[0],
+  role: Parameters<typeof applyRoleModifierWith>[1],
+  setsBounds: Parameters<typeof applyRoleModifierWith>[2],
+  rules: RoleRules = DEFAULT_ROLE_RULES,
+) => applyRoleModifierWith(baseline, role, setsBounds, rules);
 
 let counter = 0;
 function mockExercise(overrides: Partial<CatalogExercise> = {}): CatalogExercise {
@@ -160,4 +174,60 @@ describe("applyRoleModifier", () => {
     const result = applyRoleModifier(baseline, "finisher", setsBounds);
     expect(result.repMin).toBeLessThanOrEqual(result.repMax);
   });
+
+describe("custom role rules", () => {
+  const rules = (patch: Partial<RoleRules>): RoleRules => ({ ...DEFAULT_ROLE_RULES, ...patch });
+
+  it("maxMainSlots: 2 lets two main-only exercises both be main", () => {
+    const input = scored([mockExercise({ allowedSessionRoles: ["main"] }), mockExercise({ allowedSessionRoles: ["main"] })]);
+    expect(() => assignSessionRoles(input)).toThrow(UnassignableRoleError);
+    expect(assignSessionRoles(input, rules({ maxMainSlots: 2 })).map((r) => r.role)).toEqual(["main", "main"]);
+  });
+
+  it("a lower finisher fatigue ceiling stops a finisher; a higher one permits a heavier finisher", () => {
+    const fatigued = (fatigueScore: number) =>
+      scored([mockExercise(), mockExercise({ allowedSessionRoles: ["accessory", "finisher"], fatigueScore })]);
+
+    expect(assignSessionRoles(fatigued(4))[1]!.role).toBe("finisher");
+    expect(assignSessionRoles(fatigued(4), rules({ finisherFatigueCeiling: 3 }))[1]!.role).toBe("accessory");
+    expect(assignSessionRoles(fatigued(8))[1]!.role).toBe("accessory");
+    expect(assignSessionRoles(fatigued(8), rules({ finisherFatigueCeiling: 9 }))[1]!.role).toBe("finisher");
+  });
+});
+
+describe("applyRoleModifier with custom rules", () => {
+  const baseline = { sets: 3, repMin: 8, repMax: 12, rirMin: 1, rirMax: 3, restSeconds: 90 };
+  const bounds = { min: 2, max: 5 };
+  const withRole = (role: "main" | "accessory" | "superset" | "finisher", modifier: RoleRules["roles"]["main"]): RoleRules => ({
+    ...DEFAULT_ROLE_RULES,
+    roles: { ...DEFAULT_ROLE_RULES.roles, [role]: modifier },
+  });
+
+  it("scales rest by the configured multiplier", () => {
+    expect(applyRoleModifier(baseline, "accessory", bounds, withRole("accessory", { restMultiplier: 2 })).restSeconds).toBe(180);
+  });
+
+  it("applies the configured rep shift, RIR ceiling and sets delta, and none when absent", () => {
+    const shifted = applyRoleModifier(
+      baseline,
+      "finisher",
+      bounds,
+      withRole("finisher", { restMultiplier: 1, repShift: { min: 0, max: 2 }, rirCeiling: 1, setsDelta: 1 }),
+    );
+    expect(shifted).toMatchObject({ repMin: 8, repMax: 14, rirMax: 1, sets: 4 });
+
+    const untouched = applyRoleModifier(baseline, "finisher", bounds, withRole("finisher", { restMultiplier: 1 }));
+    expect(untouched).toMatchObject({ repMin: 8, repMax: 12, rirMin: 1, rirMax: 3, sets: 3, restSeconds: 90 });
+  });
+
+  it("honours the configured rest floor", () => {
+    const rules: RoleRules = { ...withRole("finisher", { restMultiplier: 0.3 }), restSecondsFloor: 60 };
+    expect(applyRoleModifier(baseline, "finisher", bounds, rules).restSeconds).toBe(60);
+  });
+
+  it("still clamps sets to the exercise's own range, whatever the rule says", () => {
+    const rules = withRole("accessory", { restMultiplier: 1, setsDelta: 2 });
+    expect(applyRoleModifier({ ...baseline, sets: 5 }, "accessory", bounds, rules).sets).toBe(5);
+  });
+});
 });

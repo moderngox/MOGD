@@ -4,6 +4,8 @@ import { eq } from "drizzle-orm";
 import { schema, type Database } from "@mogd/db";
 import { createExercise } from "../exercises/exerciseCatalog";
 import { upsertProgrammingProfile } from "../exercises/programmingProfiles";
+import { DEFAULT_ROLE_RULES } from "../training/roleRules";
+import { saveRoleRules } from "../training/roleRulesStore";
 import { validateProgram, type ProgramPlan } from "./validator";
 
 describe("validateProgram", () => {
@@ -44,6 +46,7 @@ describe("validateProgram", () => {
       sessionDurationMinutes: 15,
       equipment: ["dumbbells"],
       experienceLevel: "intermediate",
+      roleRulesRevisionId: null,
       workouts: [
         {
           dayIndex: 0,
@@ -207,6 +210,30 @@ describe("validateProgram", () => {
       expect(result.valid).toBe(false);
       expect(result.reasons.some((r) => r.includes(fragment))).toBe(true);
     };
+
+    it("checks against the named role-rules revision, not fixed constants", async () => {
+      const twoMains = () =>
+        pairPlan((m) => {
+          for (const member of m) {
+            member.sessionRole = "main";
+            member.supersetGroupIndex = null;
+            member.roleReason = "STRONGEST_MAIN_CANDIDATE";
+          }
+        });
+      const loose = await saveRoleRules(db, null, { ...DEFAULT_ROLE_RULES, maxMainSlots: 2 });
+
+      const underDefaults = await validateProgram(db, { ...twoMains(), roleRulesRevisionId: null });
+      expect(underDefaults.reasons.some((r) => r.includes("main exercises"))).toBe(true);
+
+      const underLoose = await validateProgram(db, { ...twoMains(), roleRulesRevisionId: loose.id });
+      expect(underLoose.reasons.some((r) => r.includes("main exercises"))).toBe(false);
+    });
+
+    it("fails explicitly when the plan names a revision that doesn't exist", async () => {
+      await expect(validateProgram(db, { ...pairPlan(), roleRulesRevisionId: "missing" })).rejects.toThrow(
+        /No role-rules revision/,
+      );
+    });
 
     it("accepts a well-formed pair", async () => {
       expect(await validateProgram(db, pairPlan())).toEqual({ valid: true, reasons: [] });

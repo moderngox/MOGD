@@ -11,9 +11,14 @@ export default async function AdminExercisesPage() {
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-3">
         <h1 className="font-display text-3xl font-semibold text-fg">Exercises</h1>
-        <Link href="/exercises/new">
-          <Button>New exercise</Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link href="/exercises/role-rules">
+            <Button variant="outline">Role rules</Button>
+          </Link>
+          <Link href="/exercises/new">
+            <Button>New exercise</Button>
+          </Link>
+        </div>
       </div>
 
       {rows.length === 0 ? (

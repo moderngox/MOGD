@@ -22,4 +22,17 @@ export {
   type ProgressionReason,
   type LoggedSetForProgression,
 } from "./progression";
+export { roleRulesSchema, DEFAULT_ROLE_RULES, ROLE_RULE_BOUNDS, type RoleRules } from "./roleRules";
+export {
+  getCurrentRoleRules,
+  getRoleRulesRevision,
+  saveRoleRules,
+  listRoleRulesRevisions,
+  restoreRoleRulesRevision,
+  resetRoleRulesToDefaults,
+  RoleRulesInvalidError,
+  RoleRulesRevisionNotFoundError,
+  type CurrentRoleRules,
+  type RoleRulesRevisionSummary,
+} from "./roleRulesStore";
 export { explainExerciseSelection } from "./explainSelection";

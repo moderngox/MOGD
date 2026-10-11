@@ -6,6 +6,8 @@ import { createExercise } from "../exercises/exerciseCatalog";
 import { generateStrategyAndNutrition } from "../nutrition/generateStrategy";
 import { generateProgram, StrategyIncompleteError } from "./generateProgram";
 import { logSet } from "../progress/sessions";
+import { DEFAULT_ROLE_RULES } from "../training/roleRules";
+import { saveRoleRules } from "../training/roleRulesStore";
 import { SESSION_ROLE_OPTIONS } from "../exercises/options";
 import type { CreateExerciseInput } from "../exercises/schemas";
 
@@ -264,6 +266,52 @@ describe("generateProgram", () => {
       rirMax: firstExercise!.rirMax,
     });
     expect(await db.select().from(schema.exerciseLogs)).toHaveLength(1);
+  });
+
+  describe("role rules", () => {
+    const mainRest = async () =>
+      (await db.select().from(schema.workoutExercises)).find((we) => we.sessionRole === "main")!.restSeconds;
+
+    it("records a null revision when running on the built-in defaults", async () => {
+      const userId = await seedUser(db);
+      await generateStrategyAndNutrition(db, userId);
+      await generateProgram(db, userId);
+      const [program] = await db.select().from(schema.programs);
+      expect(program!.roleRulesRevisionId).toBeNull();
+    });
+
+    it("applies the saved revision, records its id, and changes the prescription", async () => {
+      const userId = await seedUser(db);
+      await generateStrategyAndNutrition(db, userId);
+      await generateProgram(db, userId);
+      const defaultRest = await mainRest();
+
+      const revision = await saveRoleRules(db, null, {
+        ...DEFAULT_ROLE_RULES,
+        roles: { ...DEFAULT_ROLE_RULES.roles, main: { restMultiplier: 2 } },
+      });
+      const result = await generateProgram(db, userId);
+
+      expect(result.success).toBe(true);
+      const [program] = await db.select().from(schema.programs);
+      expect(program!.roleRulesRevisionId).toBe(revision.id);
+      expect(await mainRest()).toBeGreaterThan(defaultRest);
+    });
+
+    it("rejects explicitly, keeping the existing program, when saved rules are invalid", async () => {
+      const userId = await seedUser(db);
+      await generateStrategyAndNutrition(db, userId);
+      await generateProgram(db, userId);
+      const [before] = await db.select().from(schema.workouts);
+
+      await db.insert(schema.roleRulesRevisions).values({ rules: { roles: "garbage" } });
+      const result = await generateProgram(db, userId);
+
+      expect(result.success).toBe(false);
+      expect(result.reasons.join(" ")).toMatch(/role rules .* invalid/i);
+      const [after] = await db.select().from(schema.workouts);
+      expect(after!.id).toBe(before!.id);
+    });
   });
 });
 

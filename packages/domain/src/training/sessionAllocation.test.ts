@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { allocateSession } from "./sessionAllocation";
+import { allocateSession as allocateSessionWith } from "./sessionAllocation";
+import { DEFAULT_ROLE_RULES } from "./roleRules";
 import type { EligibleExercise } from "./candidatePool";
 import type { ProgrammingProfile } from "../exercises/programmingProfiles";
 import type { CanonicalMuscleGroup } from "../physique/muscles";
 import { SESSION_ROLE_OPTIONS } from "../exercises/options";
+
+const allocateSession = (input: Omit<Parameters<typeof allocateSessionWith>[0], "roleRules">) =>
+  allocateSessionWith({ ...input, roleRules: DEFAULT_ROLE_RULES });
 
 let counter = 0;
 let profileCounter = 0;
@@ -378,5 +382,27 @@ describe("allocateSession", () => {
       expect(members[0]!.sets).toBe(3); // the only count both ranges allow
       expect(members[1]!.sets).toBe(3);
     });
+  });
+
+  it("applies the supplied role rules to the prescription", () => {
+    const only = mockExercise({ primaryMuscles: ["upper_chest"] as CanonicalMuscleGroup[] });
+    const input = {
+      sessionLabel: "push" as const,
+      candidates: [only],
+      weeklyVolumeTargets: { upper_chest: 14 } as Record<CanonicalMuscleGroup, number>,
+      trainingBias: { hypertrophy: 0.75, strength: 0.25 },
+      sessionDurationMinutes: 30,
+    };
+    const defaultRest = allocateSession(input)[0]!.restSeconds;
+
+    const slower = allocateSessionWith({
+      ...input,
+      roleRules: {
+        ...DEFAULT_ROLE_RULES,
+        roles: { ...DEFAULT_ROLE_RULES.roles, main: { restMultiplier: 2 } },
+      },
+    });
+    expect(slower[0]!.sessionRole).toBe("main");
+    expect(slower[0]!.restSeconds).toBeGreaterThan(defaultRest);
   });
 });

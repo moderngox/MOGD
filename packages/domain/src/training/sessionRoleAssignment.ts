@@ -1,5 +1,6 @@
 import type { SessionRole } from "../exercises/options";
 import type { CatalogExercise } from "./candidatePool";
+import type { RoleRules } from "./roleRules";
 
 /**
  * docs/MOGD_06-session-role-architecture.md §10: "allow deterministic
@@ -18,37 +19,6 @@ export const ROLE_REASON_OPTIONS = [
   "SUPERSET_PAIR",
 ] as const;
 export type RoleReason = (typeof ROLE_REASON_OPTIONS)[number];
-
-export interface RoleModifier {
-  restModifierMultiplier: number;
-  repShift?: { min: number; max: number };
-  rirCeiling?: number;
-  setsDelta?: number;
-}
-
-/**
- * docs/MOGD_06 §2's conceptual per-role config, adapted to what this
- * codebase's baseline already computes (see applyRoleModifier) rather than
- * the doc's illustrative fatigue_budget/volume_bias/load_bias fields, which
- * have no corresponding inputs anywhere in sessionAllocation.ts today.
- * Illustrative starting points, not tuned constants — same caveat this
- * file's sibling sessionAllocation.ts already applies to its own weights.
- */
-export const SESSION_ROLE_MODIFIERS: Record<SessionRole, RoleModifier> = {
-  main: { restModifierMultiplier: 1.2 },
-  accessory: { restModifierMultiplier: 1.0 },
-  superset: { restModifierMultiplier: 0.7 },
-  finisher: { restModifierMultiplier: 0.6, repShift: { min: 3, max: 5 }, rirCeiling: 2, setsDelta: -1 },
-};
-
-/** At most this many exercises hold "main" in one session — flat per docs/MOGD_06 §3's
- * singular framing and its Bench Press example (a second compound falls back to accessory
- * once main is taken), not split-type-aware. */
-export const MAX_MAIN_SLOTS_PER_SESSION = 1;
-
-/** On the existing 0-10 fatigueScore scale — docs/MOGD_06 §10's "avoid placing
- * high-systemic-fatigue movements as finishers merely because the role exists." */
-export const FINISHER_FATIGUE_CEILING = 6;
 
 export interface RoleAssignment {
   role: SessionRole;
@@ -87,14 +57,14 @@ export interface RoleAssignmentState {
  * the default one. "superset" is never offered here: a superset is two exercises
  * done back to back, so it is only ever the outcome of the pairing pass
  * (training/supersetPairing.ts), which promotes accessories. */
-export function legalRolesFor(exercise: CatalogExercise, state: RoleAssignmentState): SessionRole[] {
+export function legalRolesFor(exercise: CatalogExercise, state: RoleAssignmentState, rules: RoleRules): SessionRole[] {
   const configured = exercise.allowedSessionRoles as SessionRole[];
   const allowed: SessionRole[] = configured.length === 0 ? ["accessory"] : configured;
   return allowed.filter(
     (role) =>
       role !== "superset" &&
-      !(role === "main" && state.mainSlotsFilled >= MAX_MAIN_SLOTS_PER_SESSION) &&
-      !(role === "finisher" && (exercise.fatigueScore ?? 0) > FINISHER_FATIGUE_CEILING),
+      !(role === "main" && state.mainSlotsFilled >= rules.maxMainSlots) &&
+      !(role === "finisher" && (exercise.fatigueScore ?? 0) > rules.finisherFatigueCeiling),
   );
 }
 
@@ -107,9 +77,10 @@ export function assignRole(
   exercise: CatalogExercise,
   state: RoleAssignmentState,
   isLast: boolean,
+  rules: RoleRules,
 ): RoleAssignment | null {
   const unconfigured = (exercise.allowedSessionRoles as SessionRole[]).length === 0;
-  const legal = legalRolesFor(exercise, state);
+  const legal = legalRolesFor(exercise, state, rules);
   const preferred = exercise.preferredSessionRole as SessionRole | null;
 
   const take = (role: SessionRole, roleReason: RoleReason): RoleAssignment => {
@@ -141,12 +112,13 @@ export function assignRole(
 
 export function assignSessionRoles(
   selected: { exercise: CatalogExercise; score: number }[],
+  rules: RoleRules,
 ): RoleAssignment[] {
   const state: RoleAssignmentState = { mainSlotsFilled: 0 };
   const lastIndex = selected.length - 1;
 
   return selected.map(({ exercise }, index) => {
-    const assignment = assignRole(exercise, state, index === lastIndex);
+    const assignment = assignRole(exercise, state, index === lastIndex, rules);
     if (!assignment) throw new UnassignableRoleError(exercise.canonicalId);
     return assignment;
   });
@@ -161,8 +133,6 @@ interface Prescription {
   restSeconds: number;
 }
 
-const REST_SECONDS_FLOOR = 30;
-
 /**
  * Layers a role's modifier on top of the baseline sessionAllocation.ts
  * already computes from trainingBias/movement pattern — deliberately NOT a
@@ -175,12 +145,13 @@ export function applyRoleModifier(
   baseline: Prescription,
   role: SessionRole,
   setsBounds: { min: number; max: number },
+  rules: RoleRules,
 ): Prescription {
-  const modifier = SESSION_ROLE_MODIFIERS[role];
+  const modifier = rules.roles[role];
 
   const restSeconds = Math.max(
-    REST_SECONDS_FLOOR,
-    Math.round((baseline.restSeconds * modifier.restModifierMultiplier) / 5) * 5,
+    rules.restSecondsFloor,
+    Math.round((baseline.restSeconds * modifier.restMultiplier) / 5) * 5,
   );
 
   let repMin = baseline.repMin;

@@ -21,6 +21,9 @@ export const programs = sqliteTable("program", {
     .references(() => users.id, { onDelete: "cascade" }),
   splitType: text("splitType").notNull(),
   sessionsPerWeek: integer("sessionsPerWeek").notNull(),
+  // The role-rules revision this program was generated under; null = built-in
+  // defaults. No FK: revisions are append-only and never deleted.
+  roleRulesRevisionId: text("roleRulesRevisionId"),
   createdAt: integer("createdAt", { mode: "timestamp_ms" })
     .notNull()
     .$defaultFn(() => new Date()),
