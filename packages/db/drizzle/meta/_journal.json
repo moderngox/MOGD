@@ -99,6 +99,27 @@
       "when": 1789573681190,
       "tag": "0013_add_workout_exercise_rir_range",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1791735980444,
+      "tag": "0014_workout_sessions",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "6",
+      "when": 1791736022258,
+      "tag": "0015_drop_exercise_log_workout_id",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "6",
+      "when": 1791736291040,
+      "tag": "0016_performance_recommendation_message",
+      "breakpoints": true
     }
   ]
 }

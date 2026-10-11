@@ -3,9 +3,11 @@ import { schema, type Database } from "@mogd/db";
 
 /**
  * Every user-owned table cascades from users.id via onDelete: "cascade"
- * except exercise_logs.workoutId (deliberately onDelete: "set null" so
- * historical performance data survives program regeneration — see
- * packages/db schema comments). Deleting the users row is therefore
+ * (workout_session.workoutId is the one deliberate "set null" link, so
+ * performed workouts survive program regeneration, but the sessions
+ * themselves cascade from the user: user -> session -> exercise performance
+ * -> logged sets — see packages/db/src/schema/workoutSessions.ts). Deleting
+ * the users row is therefore
  * sufficient to erase all of a user's assessment, strategy, program,
  * measurement, check-in and ai_runs data at the database level.
  *

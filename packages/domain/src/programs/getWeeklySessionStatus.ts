@@ -17,8 +17,8 @@ export interface WeeklySessionView {
  * program, for the dashboard's weekly session list. There is no calendar
  * scheduling (packages/db/src/schema/programs.ts: "no separate phase/week
  * tables yet") — this is a rotation heuristic, not true scheduling: a
- * workout is "logged" if it has a completed exercise log within the last
- * 7 days; the first not-yet-logged workout, in dayIndex order, is
+ * workout is "logged" if one of its occurrences has a logged set within the
+ * last 7 days (finishing the session isn't required); the first not-yet-logged workout, in dayIndex order, is
  * "today"; the rest are "scheduled". See design.md's Today-screen section.
  */
 export async function getWeeklySessionStatus(db: Database, userId: string): Promise<WeeklySessionView[]> {
@@ -26,13 +26,21 @@ export async function getWeeklySessionStatus(db: Database, userId: string): Prom
   if (!program) return [];
 
   const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-  const logs = await db
-    .select({ workoutId: schema.exerciseLogs.workoutId, completedAt: schema.exerciseLogs.completedAt })
+  const sessions = await db
+    .select({
+      workoutId: schema.workoutSessions.workoutId,
+      completedAt: schema.exerciseLogs.completedAt,
+    })
     .from(schema.exerciseLogs)
-    .where(and(eq(schema.exerciseLogs.userId, userId), gte(schema.exerciseLogs.completedAt, since)));
+    .innerJoin(
+      schema.workoutExercisePerformances,
+      eq(schema.exerciseLogs.workoutExercisePerformanceId, schema.workoutExercisePerformances.id),
+    )
+    .innerJoin(schema.workoutSessions, eq(schema.workoutExercisePerformances.workoutSessionId, schema.workoutSessions.id))
+    .where(and(eq(schema.workoutSessions.userId, userId), gte(schema.exerciseLogs.completedAt, since)));
 
   const lastLoggedAt = new Map<string, Date>();
-  for (const log of logs) {
+  for (const log of sessions) {
     if (!log.workoutId) continue;
     const existing = lastLoggedAt.get(log.workoutId);
     if (!existing || log.completedAt > existing) {

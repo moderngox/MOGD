@@ -420,7 +420,9 @@ Persist:
 - completion
 - timestamp
 
-Previous exercise performance should be available to future sessions. Progression evaluates every set logged in the most recent session, not just the latest set — a rep ceiling reached at RIR 0 is not the same signal as reaching it within the prescribed RIR range, and a pain or invalid-technique flag on any set blocks an automatic load increase regardless of reps achieved.
+Sets belong to a dated **workout occurrence**, not to the recurring program slot: `workout_session` (one physical workout; its `workoutId` is set null if the slot is regenerated away) → `workout_exercise_performance` (one exercise within it, holding a snapshot of the prescription and the recommendation the athlete was shown) → set rows in `exercise_log`. The first logged set starts or resumes the open occurrence (one per slot, enforced by a partial unique index); logging a set is an upsert on `(performance, setNumber)` so retries and corrections never duplicate; finishing confirms the workout and opens a summary where any set can still be corrected. Regenerating the program abandons an open occurrence but keeps its snapshots and sets.
+
+Previous exercise performance should be available to future sessions, read from the most recent *other* occurrence (never the one in progress). Progression evaluates every set logged in that occurrence, not just the latest set — a rep ceiling reached at RIR 0 is not the same signal as reaching it within the prescribed RIR range, and a pain or invalid-technique flag on any set blocks an automatic load increase regardless of reps achieved.
 
 ---
 

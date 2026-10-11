@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { schema, type Database } from "@mogd/db";
 import type { ExperienceLevel, Equipment } from "../assessment/options";
 import { getGoalStrategy } from "../nutrition/getTargets";
@@ -93,9 +93,14 @@ export async function generateProgram(db: Database, userId: string): Promise<Gen
         .update(schema.programs)
         .set({ splitType, sessionsPerWeek: training.sessionsPerWeek, updatedAt: new Date() })
         .where(eq(schema.programs.id, programId));
-      // Deleting workouts cascades to workout_exercises, and sets
-      // exercise_logs.workoutId to null (never cascade-deletes logs) —
-      // see packages/db/src/schema/programs.ts.
+      // An open workout whose slot is about to disappear can't be resumed —
+      // close it out as abandoned. Its performances and prescription
+      // snapshots are kept (workout_session.workoutId is set null, never
+      // cascade-deleted) — see packages/db/src/schema/workoutSessions.ts.
+      await tx
+        .update(schema.workoutSessions)
+        .set({ status: "abandoned" })
+        .where(and(eq(schema.workoutSessions.userId, userId), eq(schema.workoutSessions.status, "in_progress")));
       await tx.delete(schema.workouts).where(eq(schema.workouts.programId, programId));
     } else {
       const [created] = await tx

@@ -4,7 +4,14 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Badge, Button, Checkbox, Input } from "@mogd/ui";
 import type { BadgeVariant } from "@mogd/ui";
-import { logSetAction } from "./actions";
+import { deleteLastSetAction, finishSessionAction, logSetAction } from "./actions";
+
+interface LoggedSetView {
+  id: string;
+  setNumber: number;
+  loadKg: number | null;
+  reps: number;
+}
 
 export interface SessionExerciseView {
   workoutExerciseId: string;
@@ -28,12 +35,9 @@ export interface SessionExerciseView {
     message: string;
     loadInstruction: string | null;
   };
-}
-
-interface LoggedSet {
-  setNumber: number;
-  loadKg?: number;
-  reps: number;
+  /** Null until the first set of this exercise is logged in the open occurrence. */
+  performanceId: string | null;
+  loggedSets: LoggedSetView[];
 }
 
 /** "accessory" is the unmarked default — no badge for it, to avoid a badge on every card. */
@@ -46,11 +50,15 @@ const SESSION_ROLE_BADGES: Record<string, { label: string; variant: BadgeVariant
 function ExerciseCard({
   exercise,
   workoutId,
+  onSessionStarted,
 }: {
   exercise: SessionExerciseView;
   workoutId: string;
+  onSessionStarted: (sessionId: string) => void;
 }) {
-  const [logged, setLogged] = useState<LoggedSet[]>([]);
+  // Initialised from the server so a reload resumes where the athlete left off.
+  const [logged, setLogged] = useState<LoggedSetView[]>(exercise.loggedSets);
+  const [performanceId, setPerformanceId] = useState<string | null>(exercise.performanceId);
   const [loadInput, setLoadInput] = useState("");
   const [repsInput, setRepsInput] = useState("");
   const [rirInput, setRirInput] = useState("");
@@ -78,9 +86,9 @@ function ExerciseCard({
 
     setSaving(true);
     try {
-      await logSetAction({
-        exerciseId: exercise.exerciseId,
+      const result = await logSetAction({
         workoutId,
+        exerciseId: exercise.exerciseId,
         setNumber: nextSetNumber,
         loadKg,
         reps,
@@ -88,13 +96,29 @@ function ExerciseCard({
         painFlag: painFlag || undefined,
         techniqueValid: techniqueConcern ? false : undefined,
       });
-      setLogged((prev) => [...prev, { setNumber: nextSetNumber, loadKg, reps }]);
+      setPerformanceId(result.performanceId);
+      if (result.sessionId) onSessionStarted(result.sessionId);
+      setLogged((prev) => [...prev, { id: result.setId, setNumber: nextSetNumber, loadKg: loadKg ?? null, reps }]);
       setRepsInput("");
       setRirInput("");
       setPainFlag(false);
       setTechniqueConcern(false);
     } catch {
       setError("Could not save this set. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function undoLastSet() {
+    if (!performanceId) return;
+    setError(null);
+    setSaving(true);
+    try {
+      await deleteLastSetAction(performanceId);
+      setLogged((prev) => prev.slice(0, -1));
+    } catch {
+      setError("Could not remove the last set. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -140,13 +164,18 @@ function ExerciseCard({
       <p className="text-xs text-zinc-500">{exercise.progressionTarget.message}</p>
 
       {logged.length > 0 && (
-        <ul className="text-sm text-zinc-400">
-          {logged.map((s) => (
-            <li key={s.setNumber}>
-              Set {s.setNumber}: {s.loadKg ?? "—"} kg × {s.reps}
-            </li>
-          ))}
-        </ul>
+        <div className="flex items-start justify-between gap-2">
+          <ul className="text-sm text-zinc-400">
+            {logged.map((s) => (
+              <li key={s.id}>
+                Set {s.setNumber}: {s.loadKg ?? "—"} kg × {s.reps}
+              </li>
+            ))}
+          </ul>
+          <Button variant="secondary" onClick={undoLastSet} disabled={saving}>
+            Undo last set
+          </Button>
+        </div>
       )}
 
       {!done ? (
@@ -202,12 +231,30 @@ function ExerciseCard({
 
 export function SessionExecution({
   workoutId,
+  sessionId: initialSessionId,
   exercises,
 }: {
   workoutId: string;
+  sessionId: string | null;
   exercises: SessionExerciseView[];
 }) {
   const router = useRouter();
+  const [sessionId, setSessionId] = useState<string | null>(initialSessionId);
+  const [finishing, setFinishing] = useState(false);
+  const [finishError, setFinishError] = useState<string | null>(null);
+
+  async function finish() {
+    if (!sessionId) return;
+    setFinishError(null);
+    setFinishing(true);
+    try {
+      const result = await finishSessionAction(sessionId);
+      router.push(`/session/summary/${result.sessionId}`);
+    } catch {
+      setFinishError("Could not finish the workout. Please try again.");
+      setFinishing(false);
+    }
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -218,8 +265,17 @@ export function SessionExecution({
         </Button>
       </div>
       {exercises.map((exercise) => (
-        <ExerciseCard key={exercise.workoutExerciseId} exercise={exercise} workoutId={workoutId} />
+        <ExerciseCard
+          key={exercise.workoutExerciseId}
+          exercise={exercise}
+          workoutId={workoutId}
+          onSessionStarted={setSessionId}
+        />
       ))}
+      <Button onClick={finish} disabled={!sessionId || finishing}>
+        {finishing ? "Finishing…" : "Finish workout"}
+      </Button>
+      {finishError && <p className="text-sm text-red-400">{finishError}</p>}
     </div>
   );
 }

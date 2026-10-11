@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
 import { users } from "./auth";
 import { exercises } from "./exercises";
 
@@ -80,38 +80,4 @@ export const workoutExercises = sqliteTable("workout_exercise", {
   // Unused by the engine yet (superset ships unpaired in v1) — reserved so a
   // future pairing pass has somewhere to write without another migration.
   supersetGroupId: text("supersetGroupId"),
-});
-
-/**
- * Set-level logging (docs/ARCHITECTURE.md §14). workoutId is nullable and
- * set null on delete — deliberately NOT cascade — so a program
- * regeneration that replaces workouts can never delete performance
- * history. exerciseId is the stable join for "previous performance",
- * since the same exercise recurs across program regenerations.
- */
-export const exerciseLogs = sqliteTable("exercise_log", {
-  id: text("id")
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
-  userId: text("userId")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  exerciseId: text("exerciseId")
-    .notNull()
-    .references(() => exercises.id, { onDelete: "cascade" }),
-  workoutId: text("workoutId").references(() => workouts.id, { onDelete: "set null" }),
-  setNumber: integer("setNumber").notNull(),
-  loadKg: real("loadKg"),
-  reps: integer("reps").notNull(),
-  rir: integer("rir"),
-  // Optional signals from mogd_programming_engine_specs 03-workout-log-history.md:
-  // "user manually changed prescribed load" is out of scope for this pass,
-  // but pain/technique gate the progression engine (see
-  // packages/domain/src/training/progression.ts) — null means "not reported",
-  // never coerced to false.
-  painFlag: integer("painFlag", { mode: "boolean" }),
-  techniqueValid: integer("techniqueValid", { mode: "boolean" }),
-  completedAt: integer("completedAt", { mode: "timestamp_ms" })
-    .notNull()
-    .$defaultFn(() => new Date()),
 });

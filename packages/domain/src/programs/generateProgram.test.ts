@@ -5,6 +5,7 @@ import { schema, type Database } from "@mogd/db";
 import { createExercise } from "../exercises/exerciseCatalog";
 import { generateStrategyAndNutrition } from "../nutrition/generateStrategy";
 import { generateProgram, StrategyIncompleteError } from "./generateProgram";
+import { logSet } from "../progress/sessions";
 import { SESSION_ROLE_OPTIONS } from "../exercises/options";
 import type { CreateExerciseInput } from "../exercises/schemas";
 
@@ -229,7 +230,7 @@ describe("generateProgram", () => {
     expect(workouts).toHaveLength(2);
   });
 
-  it("preserves exercise_logs after a program regeneration deletes the old workout", async () => {
+  it("keeps performed sessions, their snapshots and sets after regeneration, and abandons the open session", async () => {
     const userId = await seedUser(db);
     await generateStrategyAndNutrition(db, userId);
     await generateProgram(db, userId);
@@ -239,20 +240,28 @@ describe("generateProgram", () => {
       .select()
       .from(schema.workoutExercises)
       .where(eq(schema.workoutExercises.workoutId, firstWorkout!.id));
-
-    await db.insert(schema.exerciseLogs).values({
-      userId,
-      exerciseId: firstExercise!.exerciseId,
+    await logSet(db, userId, {
       workoutId: firstWorkout!.id,
+      exerciseId: firstExercise!.exerciseId,
       setNumber: 1,
       loadKg: 30,
       reps: 10,
     });
 
-    await generateProgram(db, userId); // regenerate — deletes old workouts
+    await generateProgram(db, userId); // regenerate — deletes the old workout slots
 
-    const logs = await db.select().from(schema.exerciseLogs);
-    expect(logs).toHaveLength(1);
-    expect(logs[0]?.workoutId).toBeNull(); // FK set null, row preserved
+    const sessions = await db.select().from(schema.workoutSessions);
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0]).toMatchObject({ workoutId: null, status: "abandoned" });
+
+    const [performance] = await db.select().from(schema.workoutExercisePerformances);
+    expect(performance).toMatchObject({
+      exerciseId: firstExercise!.exerciseId,
+      repMin: firstExercise!.repMin,
+      repMax: firstExercise!.repMax,
+      rirMin: firstExercise!.rirMin,
+      rirMax: firstExercise!.rirMax,
+    });
+    expect(await db.select().from(schema.exerciseLogs)).toHaveLength(1);
   });
 });

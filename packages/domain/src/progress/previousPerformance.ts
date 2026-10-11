@@ -1,34 +1,24 @@
-import { and, eq, desc } from "drizzle-orm";
+import { and, asc, desc, eq, ne } from "drizzle-orm";
 import { schema, type Database } from "@mogd/db";
 import { computeProgressionTarget, type ProgressionTarget } from "../training/progression";
+
+/**
+ * History = the sets of the athlete's most recent *other* workout occurrence
+ * for this exercise (mogd_programming_engine_specs 03/04). `excludeSessionId`
+ * is the session being performed right now, so a half-finished workout never
+ * becomes its own "last session". Finishing a session is a confirmation step,
+ * not a gate: any other occurrence with logged sets counts, otherwise a user
+ * who forgets the button would silently stop progressing.
+ */
+export interface HistoryOptions {
+  excludeSessionId?: string;
+}
 
 export interface PreviousPerformance {
   loadKg: number | null;
   reps: number;
   rir: number | null;
   completedAt: Date;
-}
-
-/** "Previous exercise performance should be available to future sessions"
- * (docs/ARCHITECTURE.md §14) — looks up by (userId, exerciseId) directly,
- * independent of which workout or program version it was logged under, so
- * it survives a program regeneration. Returns the single most recently
- * logged set — used for the "Previous" display, not for progression (see
- * getRecentSessionPerformance below for that). */
-export async function getPreviousPerformance(
-  db: Database,
-  userId: string,
-  exerciseId: string,
-): Promise<PreviousPerformance | null> {
-  const [log] = await db
-    .select()
-    .from(schema.exerciseLogs)
-    .where(and(eq(schema.exerciseLogs.userId, userId), eq(schema.exerciseLogs.exerciseId, exerciseId)))
-    .orderBy(desc(schema.exerciseLogs.completedAt))
-    .limit(1);
-
-  if (!log) return null;
-  return { loadKg: log.loadKg, reps: log.reps, rir: log.rir, completedAt: log.completedAt };
 }
 
 export interface RecentSessionSet {
@@ -41,48 +31,59 @@ export interface RecentSessionSet {
   completedAt: Date;
 }
 
-/** UTC calendar day — the "session" boundary used below. Nothing in the
- * current schema marks which logged sets belong to the same physical
- * workout occurrence (workoutId identifies a recurring program slot, not a
- * dated instance — the same Push Day slot is reused every week), so
- * same-calendar-day is used as a deterministic, documented stand-in rather
- * than adding a new session-occurrence entity (see the approved
- * implementation plan's deviation #2). */
-function dateKey(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
-
-/**
- * Every set from the most recent day this exercise was logged, ordered by
- * setNumber — the progression engine's real input (mogd_programming_engine_specs
- * 04), unlike getPreviousPerformance's single-set snapshot above.
- */
+/** Sets of the most recent other occurrence that has any, ordered by set number; [] when none. */
 export async function getRecentSessionPerformance(
   db: Database,
   userId: string,
   exerciseId: string,
+  options: HistoryOptions = {},
 ): Promise<RecentSessionSet[]> {
-  const logs = await db
-    .select()
+  const conditions = [
+    eq(schema.workoutSessions.userId, userId),
+    eq(schema.workoutExercisePerformances.exerciseId, exerciseId),
+  ];
+  if (options.excludeSessionId) conditions.push(ne(schema.workoutSessions.id, options.excludeSessionId));
+
+  const rows = await db
+    .select({
+      performanceId: schema.workoutExercisePerformances.id,
+      set: schema.exerciseLogs,
+    })
     .from(schema.exerciseLogs)
-    .where(and(eq(schema.exerciseLogs.userId, userId), eq(schema.exerciseLogs.exerciseId, exerciseId)))
-    .orderBy(desc(schema.exerciseLogs.completedAt));
+    .innerJoin(
+      schema.workoutExercisePerformances,
+      eq(schema.exerciseLogs.workoutExercisePerformanceId, schema.workoutExercisePerformances.id),
+    )
+    .innerJoin(schema.workoutSessions, eq(schema.workoutExercisePerformances.workoutSessionId, schema.workoutSessions.id))
+    .where(and(...conditions))
+    .orderBy(desc(schema.workoutSessions.startedAt), asc(schema.exerciseLogs.setNumber));
 
-  if (logs.length === 0) return [];
+  if (rows.length === 0) return [];
 
-  const latestDay = dateKey(logs[0]!.completedAt);
-  return logs
-    .filter((log) => dateKey(log.completedAt) === latestDay)
-    .sort((a, b) => a.setNumber - b.setNumber)
-    .map((log) => ({
-      setNumber: log.setNumber,
-      loadKg: log.loadKg,
-      reps: log.reps,
-      rir: log.rir,
-      painFlag: log.painFlag,
-      techniqueValid: log.techniqueValid,
-      completedAt: log.completedAt,
+  const latestPerformanceId = rows[0]!.performanceId;
+  return rows
+    .filter((row) => row.performanceId === latestPerformanceId)
+    .map(({ set }) => ({
+      setNumber: set.setNumber,
+      loadKg: set.loadKg,
+      reps: set.reps,
+      rir: set.rir,
+      painFlag: set.painFlag,
+      techniqueValid: set.techniqueValid,
+      completedAt: set.completedAt,
     }));
+}
+
+/** The last set of the most recent other occurrence — the "Previous" display. */
+export async function getPreviousPerformance(
+  db: Database,
+  userId: string,
+  exerciseId: string,
+  options: HistoryOptions = {},
+): Promise<PreviousPerformance | null> {
+  const last = (await getRecentSessionPerformance(db, userId, exerciseId, options)).at(-1);
+  if (!last) return null;
+  return { loadKg: last.loadKg, reps: last.reps, rir: last.rir, completedAt: last.completedAt };
 }
 
 /** Every distinct load (kg) the athlete has ever logged for this exercise —
@@ -96,20 +97,19 @@ export async function getObservedLoadsKg(db: Database, userId: string, exerciseI
 }
 
 /**
- * Combines the recent-session lookup with the deterministic progression
- * rule for one workout exercise slot — the single function apps/web's
- * session view needs per exercise. `prescription` is the exercise's
- * currently generated target (already role-modified — see
- * training/sessionAllocation.ts), which also serves as the comparison basis
- * for "did the last session hit this range."
+ * Combines the history lookup with the deterministic progression rule for one
+ * workout exercise slot. `prescription` is the exercise's currently generated
+ * target (already role-modified — see training/sessionAllocation.ts), which
+ * also serves as the comparison basis for "did the last session hit this range."
  */
 export async function getProgressionTargetForExercise(
   db: Database,
   userId: string,
   exerciseId: string,
   prescription: { sets: number; repMin: number; repMax: number; rirMin: number; rirMax: number },
+  options: HistoryOptions = {},
 ): Promise<ProgressionTarget> {
-  const recentSets = await getRecentSessionPerformance(db, userId, exerciseId);
+  const recentSets = await getRecentSessionPerformance(db, userId, exerciseId, options);
   const observedLoadsKg = await getObservedLoadsKg(db, userId, exerciseId);
 
   return computeProgressionTarget({
