@@ -243,6 +243,7 @@ describe("generateProgram", () => {
     await logSet(db, userId, {
       workoutId: firstWorkout!.id,
       exerciseId: firstExercise!.exerciseId,
+      locationId: null,
       setNumber: 1,
       loadKg: 30,
       reps: 10,

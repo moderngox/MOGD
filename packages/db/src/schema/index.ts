@@ -6,5 +6,6 @@ export * from "./exerciseProgrammingProfiles";
 export * from "./exerciseRelationships";
 export * from "./strategy";
 export * from "./programs";
+export * from "./trainingLocations";
 export * from "./workoutSessions";
 export * from "./checkins";

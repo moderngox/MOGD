@@ -59,7 +59,7 @@ describe("computeTrainingAdherence", () => {
 
   it("counts workout occurrences toward the expected weekly session count", async () => {
     const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000); // 1 week, 3 expected sessions
-    await logSet(db, userId, { workoutId, exerciseId, setNumber: 1, reps: 10 });
+    await logSet(db, userId, { workoutId, exerciseId, locationId: null, setNumber: 1, reps: 10 });
 
     const result = await computeTrainingAdherence(db, userId, since);
     // 1 of 3 expected sessions this week.
@@ -69,7 +69,7 @@ describe("computeTrainingAdherence", () => {
 
   it("caps at 100 even with more logged days than expected sessions", async () => {
     const since = new Date(Date.now() - 1 * 24 * 60 * 60 * 1000); // 1 day, <1 expected session
-    await logSet(db, userId, { workoutId, exerciseId, setNumber: 1, reps: 10 });
+    await logSet(db, userId, { workoutId, exerciseId, locationId: null, setNumber: 1, reps: 10 });
     const result = await computeTrainingAdherence(db, userId, since);
     expect(result).toBeLessThanOrEqual(100);
   });

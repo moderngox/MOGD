@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Badge, Button, Checkbox, Input } from "@mogd/ui";
+import { Badge, Button, Checkbox, Input, Select } from "@mogd/ui";
 import type { BadgeVariant } from "@mogd/ui";
-import { deleteLastSetAction, finishSessionAction, logSetAction } from "./actions";
+import { createLocationAction, deleteLastSetAction, finishSessionAction, logSetAction } from "./actions";
 
 interface LoggedSetView {
   id: string;
@@ -50,10 +50,12 @@ const SESSION_ROLE_BADGES: Record<string, { label: string; variant: BadgeVariant
 function ExerciseCard({
   exercise,
   workoutId,
+  locationId,
   onSessionStarted,
 }: {
   exercise: SessionExerciseView;
   workoutId: string;
+  locationId: string | null;
   onSessionStarted: (sessionId: string) => void;
 }) {
   // Initialised from the server so a reload resumes where the athlete left off.
@@ -89,6 +91,7 @@ function ExerciseCard({
       const result = await logSetAction({
         workoutId,
         exerciseId: exercise.exerciseId,
+        locationId,
         setNumber: nextSetNumber,
         loadKg,
         reps,
@@ -229,14 +232,94 @@ function ExerciseCard({
   );
 }
 
+function LocationPicker({
+  locations,
+  locationId,
+  locked,
+}: {
+  locations: { id: string; name: string }[];
+  locationId: string | null;
+  locked: boolean;
+}) {
+  const router = useRouter();
+  const [newName, setNewName] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  async function addLocation() {
+    setError(null);
+    setSaving(true);
+    try {
+      const created = await createLocationAction(newName);
+      setNewName("");
+      router.replace(`?location=${created.id}`);
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error && err.message.includes("already") ? err.message : "Could not add this place.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const current = locations.find((l) => l.id === locationId);
+
+  return (
+    <div className="flex flex-col gap-2 rounded-md border border-zinc-800 p-3">
+      <p className="text-xs uppercase tracking-wide text-zinc-500">Training place</p>
+      {locations.length > 0 && (
+        <Select
+          value={locationId ?? ""}
+          disabled={locked}
+          onChange={(e) => router.replace(`?location=${e.target.value}`)}
+        >
+          {locations.map((l) => (
+            <option key={l.id} value={l.id}>
+              {l.name}
+            </option>
+          ))}
+        </Select>
+      )}
+      {locked ? (
+        <p className="text-xs text-zinc-500">
+          {current ? `Locked to ${current.name} for this workout.` : "This workout has no named place."}
+        </p>
+      ) : (
+        <>
+          <div className="flex items-end gap-2">
+            <Input
+              placeholder={locations.length === 0 ? "Name where you train (optional)" : "New place…"}
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+            />
+            <Button variant="secondary" onClick={addLocation} disabled={saving || newName.trim() === ""}>
+              Add
+            </Button>
+          </div>
+          <p className="text-xs text-zinc-500">
+            Loads don&apos;t transfer between equipment, so progress is tracked per place.
+            {locations.length === 0 && " Your earlier workouts will be assigned to the first place you add."}
+          </p>
+        </>
+      )}
+      {error && <p className="text-sm text-red-400">{error}</p>}
+    </div>
+  );
+}
+
 export function SessionExecution({
   workoutId,
   sessionId: initialSessionId,
   exercises,
+  locations,
+  locationId,
+  locationLocked,
 }: {
   workoutId: string;
   sessionId: string | null;
   exercises: SessionExerciseView[];
+  locations: { id: string; name: string }[];
+  locationId: string | null;
+  locationLocked: boolean;
 }) {
   const router = useRouter();
   const [sessionId, setSessionId] = useState<string | null>(initialSessionId);
@@ -264,11 +347,13 @@ export function SessionExecution({
           Back to program
         </Button>
       </div>
+      <LocationPicker locations={locations} locationId={locationId} locked={locationLocked} />
       {exercises.map((exercise) => (
         <ExerciseCard
           key={exercise.workoutExerciseId}
           exercise={exercise}
           workoutId={workoutId}
+          locationId={locationId}
           onSessionStarted={setSessionId}
         />
       ))}

@@ -25,6 +25,12 @@ export async function logSetAction(input: progress.LogSetInput) {
   return { setId: set.id, performanceId: set.workoutExercisePerformanceId!, sessionId: session?.id ?? null };
 }
 
+export async function createLocationAction(name: string) {
+  const userId = await requireUserId();
+  const location = await progress.createLocation(getDb(), userId, name);
+  return { id: location.id, name: location.name };
+}
+
 export async function deleteLastSetAction(performanceId: string) {
   const userId = await requireUserId();
   return progress.deleteLastSet(getDb(), userId, performanceId);

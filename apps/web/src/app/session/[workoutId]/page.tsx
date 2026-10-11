@@ -7,10 +7,13 @@ import { SessionExecution, type SessionExerciseView } from "./SessionExecution";
 
 export default async function SessionPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ workoutId: string }>;
+  searchParams: Promise<{ location?: string }>;
 }) {
   const { workoutId } = await params;
+  const { location: requestedLocation } = await searchParams;
   const session = await auth();
   if (!session?.user?.id) {
     redirect("/sign-in");
@@ -37,7 +40,20 @@ export default async function SessionPage({
   // started by the first logged set (see logSetAction), and resumed here.
   const openSession = await progress.getInProgressSession(db, userId, workoutId);
   const summary = openSession ? await progress.getSessionSummary(db, userId, openSession.id) : null;
-  const history = { excludeSessionId: openSession?.id };
+  const locations = await progress.listLocations(db, userId);
+
+  // The equipment context is fixed for an open occurrence. Otherwise: no named
+  // places yet -> the unspecified context; else the requested place, falling
+  // back to where the athlete trained last, then their first place.
+  const defaultLocationId = await progress.getDefaultLocationId(db, userId);
+  const locationId: string | null = openSession
+    ? openSession.trainingLocationId
+    : locations.length === 0
+      ? null
+      : (locations.find((l) => l.id === requestedLocation)?.id ??
+        locations.find((l) => l.id === defaultLocationId)?.id ??
+        locations[0]!.id);
+  const history = { locationId, excludeSessionId: openSession?.id };
 
   const exercises: SessionExerciseView[] = [];
   for (const exercise of workout.exercises) {
@@ -100,7 +116,14 @@ export default async function SessionPage({
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col gap-4 p-8">
-      <SessionExecution workoutId={workoutId} sessionId={openSession?.id ?? null} exercises={exercises} />
+      <SessionExecution
+        workoutId={workoutId}
+        sessionId={openSession?.id ?? null}
+        exercises={exercises}
+        locations={locations.map((l) => ({ id: l.id, name: l.name }))}
+        locationId={locationId}
+        locationLocked={Boolean(openSession)}
+      />
     </main>
   );
 }

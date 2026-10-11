@@ -3,6 +3,7 @@ import { sql } from "drizzle-orm";
 import { users } from "./auth";
 import { exercises } from "./exercises";
 import { workouts } from "./programs";
+import { trainingLocations } from "./trainingLocations";
 
 // Kept in sync by hand with packages/domain (packages/db never imports from
 // packages/domain — same convention as exercises.ts / programs.ts).
@@ -18,6 +19,7 @@ const ROLE_REASON_VALUES = [
 ] as const;
 const PROGRESSION_REASON_VALUES = [
   "NO_LOAD_HISTORY",
+  "CONTEXT_CHANGED",
   "REASSESS_DUE_TO_PAIN",
   "HOLD_FOR_TECHNIQUE",
   "CONTINUE_CURRENT_LOAD",
@@ -43,6 +45,9 @@ export const workoutSessions = sqliteTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     workoutId: text("workoutId").references(() => workouts.id, { onDelete: "set null" }),
+    // Equipment context of this occurrence. Null is a real bucket (never a
+    // wildcard): history only compares sessions in the same context.
+    trainingLocationId: text("trainingLocationId").references(() => trainingLocations.id, { onDelete: "set null" }),
     // Text snapshot so the session stays interpretable once its workout is gone.
     sessionLabel: text("sessionLabel").notNull(),
     status: text("status", { enum: SESSION_STATUS_VALUES }).notNull().default("in_progress"),

@@ -2,6 +2,7 @@ import { and, asc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { schema, type Database } from "@mogd/db";
 import { getWorkoutOwnerId } from "../programs/getProgram";
+import { getOwnedLocation } from "./locations";
 import { getProgressionTargetForExercise } from "./previousPerformance";
 
 export type WorkoutSession = typeof schema.workoutSessions.$inferSelect;
@@ -19,6 +20,13 @@ export class ExerciseNotInWorkoutError extends Error {
   constructor(exerciseId: string) {
     super(`Exercise "${exerciseId}" is not part of this workout`);
     this.name = "ExerciseNotInWorkoutError";
+  }
+}
+
+export class SessionLocationMismatchError extends Error {
+  constructor() {
+    super("This workout is already in progress at a different training location");
+    this.name = "SessionLocationMismatchError";
   }
 }
 
@@ -46,6 +54,8 @@ export class SetNotFoundError extends Error {
 export const logSetInput = z.object({
   workoutId: z.string().min(1),
   exerciseId: z.string().min(1),
+  /** Equipment context of the occurrence; fixed when it starts. Null = no named place. */
+  locationId: z.string().min(1).nullable(),
   setNumber: z.number().int().min(1).max(20),
   loadKg: z.number().min(0).max(500).optional(),
   reps: z.number().int().min(0).max(100),
@@ -97,8 +107,10 @@ export async function getOrStartPerformance(
   userId: string,
   workoutId: string,
   exerciseId: string,
+  locationId: string | null,
 ): Promise<{ session: WorkoutSession; performance: ExercisePerformance }> {
   if ((await getWorkoutOwnerId(db, workoutId)) !== userId) throw new WorkoutNotOwnedError();
+  if (locationId !== null) await getOwnedLocation(db, userId, locationId);
 
   const [slot] = await db
     .select()
@@ -111,10 +123,12 @@ export async function getOrStartPerformance(
   if (!session) {
     await db
       .insert(schema.workoutSessions)
-      .values({ userId, workoutId, sessionLabel: workout!.sessionLabel })
+      .values({ userId, workoutId, sessionLabel: workout!.sessionLabel, trainingLocationId: locationId })
       .onConflictDoNothing();
     session = (await getInProgressSession(db, userId, workoutId))!;
   }
+  // The context is fixed for the occurrence: a stale tab must not mix equipment mid-workout.
+  if (session.trainingLocationId !== locationId) throw new SessionLocationMismatchError();
 
   const findPerformance = async () =>
     (
@@ -136,7 +150,7 @@ export async function getOrStartPerformance(
       userId,
       exerciseId,
       { sets: slot.sets, repMin: slot.repMin, repMax: slot.repMax, rirMin: slot.rirMin, rirMax: slot.rirMax },
-      { excludeSessionId: session.id },
+      { locationId: session.trainingLocationId, excludeSessionId: session.id },
     );
     await db
       .insert(schema.workoutExercisePerformances)
@@ -185,7 +199,7 @@ async function syncPerformanceCompleted(db: Database, performance: ExercisePerfo
  */
 export async function logSet(db: Database, userId: string, rawInput: LogSetInput): Promise<LoggedSet> {
   const input = logSetInput.parse(rawInput);
-  const { performance } = await getOrStartPerformance(db, userId, input.workoutId, input.exerciseId);
+  const { performance } = await getOrStartPerformance(db, userId, input.workoutId, input.exerciseId, input.locationId);
 
   const existingSets = await db
     .select()

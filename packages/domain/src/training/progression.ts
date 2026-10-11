@@ -1,11 +1,9 @@
 /**
  * Deterministic double-progression driven by actually logged performance
- * (mogd_programming_engine_specs 04-progression-engine.md), not just the
- * single most recently logged set: it evaluates every set from the most
- * recent *session* (see progress/previousPerformance.ts's
- * getRecentSessionPerformance for how "session" is grouped) against the
- * prescribed rep range AND the prescribed RIR range, and against
- * pain/technique flags, before ever recommending a load increase — CLAUDE.md
+ * (mogd_programming_engine_specs 04-progression-engine.md): it evaluates the
+ * working sets of the most recent comparable workout occurrence against the
+ * range the athlete was *actually prescribed then* (not today's), and refuses
+ * to carry a load across an equipment or prescription change — CLAUDE.md
  * rule 4: AI may explain this, never override it.
  */
 
@@ -19,6 +17,7 @@ const LOAD_EPSILON = 0.001;
  * 2. Otherwise step by the smallest gap ever observed between two distinct
  *    logged loads (an upper bound on the true smallest increment, but real data).
  * 3. With fewer than two distinct loads the increment is unknown -> null.
+ * `observedLoadsKg` must already be scoped to one equipment context.
  */
 export function resolveKnownNextLoad(
   observedLoadsKg: number[],
@@ -46,6 +45,7 @@ export function resolveKnownNextLoad(
 
 export const PROGRESSION_REASON_OPTIONS = [
   "NO_LOAD_HISTORY",
+  "CONTEXT_CHANGED",
   "REASSESS_DUE_TO_PAIN",
   "HOLD_FOR_TECHNIQUE",
   "CONTINUE_CURRENT_LOAD",
@@ -64,17 +64,24 @@ export interface LoggedSetForProgression {
   techniqueValid: boolean | null;
 }
 
-export interface ProgressionInput {
-  /** How many sets this exercise is currently prescribed — used to detect an incomplete session. */
-  prescribedSets: number;
-  /** Every set from the most recent session, empty when nothing has been logged yet. */
-  recentSets: LoggedSetForProgression[];
+export interface ProgressionPrescription {
+  sets: number;
   repMin: number;
   repMax: number;
   rirMin: number;
   rirMax: number;
-  /** Every load (kg) the athlete has ever logged for this exercise, across all sessions. */
+}
+
+export interface ProgressionInput {
+  /** Sets of the most recent other occurrence in THIS equipment context; empty when none. */
+  recentSets: LoggedSetForProgression[];
+  /** What that occurrence was prescribed; null = unknown (legacy history), treated as the current one. */
+  previousPrescription: ProgressionPrescription | null;
+  currentPrescription: ProgressionPrescription;
+  /** Every load ever logged for this exercise in this equipment context. */
   observedLoadsKg: number[];
+  /** Nothing in this context, but the athlete has done the exercise in another one. */
+  hasHistoryInOtherContext: boolean;
 }
 
 export interface ProgressionTarget {
@@ -85,32 +92,64 @@ export interface ProgressionTarget {
   /** Set when the engine wants a load change it can't express as a known kg
    * (never an invented number) - e.g. "increase to the smallest available increment". */
   loadInstruction: string | null;
-  /** Human-readable explanation for the UI — CLAUDE.md rule 8's "reject
-   * invalid output explicitly" spirit applied to progression: never silent. */
+  /** Human-readable explanation for the UI. */
   message: string;
 }
 
+function samePrescription(a: ProgressionPrescription, b: ProgressionPrescription): boolean {
+  return a.repMin === b.repMin && a.repMax === b.repMax && a.rirMin === b.rirMin && a.rirMax === b.rirMax;
+}
+
 /**
- * Decision order (first match wins) — see the approved implementation plan
- * for why REDUCE_LOAD/CONTINUE_CURRENT_LOAD's trigger conditions were a
- * judgment call the spec itself left open:
- *  1. no logged sets                                -> NO_LOAD_HISTORY
- *  2. any set flagged pain                           -> REASSESS_DUE_TO_PAIN
- *  3. any set flagged invalid technique               -> HOLD_FOR_TECHNIQUE
- *  4. fewer sets logged than prescribed               -> CONTINUE_CURRENT_LOAD
- *  5. every set hit repMax within the RIR target      -> INCREASE_LOAD
- *     (next load from observed history, else null + instruction - never invented)
- *  6. weakest set missed repMin at RIR <= 0           -> REDUCE_LOAD (same sourcing)
- *  7. otherwise                                       -> CONTINUE_REP_PROGRESSION
+ * The load most of the sets were done at (ties -> heaviest); a null load among
+ * loaded sets counts as 0. Sets at other loads are warm-up/drop sets and are
+ * not judged. Returns null for bodyweight work (no working set has a load).
+ */
+function resolveWorkingSets(sets: LoggedSetForProgression[]): { working: LoggedSetForProgression[]; loadKg: number | null } {
+  const anyLoaded = sets.some((s) => s.loadKg !== null);
+  const loadOf = (s: LoggedSetForProgression) => (anyLoaded ? (s.loadKg ?? 0) : 0);
+
+  const counts = new Map<number, number>();
+  for (const s of sets) counts.set(loadOf(s), (counts.get(loadOf(s)) ?? 0) + 1);
+  const workingLoad = [...counts.entries()].sort((a, b) => b[1] - a[1] || b[0] - a[0])[0]![0];
+
+  return {
+    working: sets.filter((s) => loadOf(s) === workingLoad),
+    loadKg: workingLoad > 0 ? workingLoad : null,
+  };
+}
+
+/**
+ * Decision order (first match wins):
+ *  1. no sets in this context                            -> CONTEXT_CHANGED (done elsewhere) / NO_LOAD_HISTORY
+ *  2. any set flagged pain                               -> REASSESS_DUE_TO_PAIN (safety outranks everything below)
+ *  3. last prescription differs from today's             -> CONTEXT_CHANGED (a different rep/RIR range implies a different load)
+ *  4. any set flagged invalid technique                  -> HOLD_FOR_TECHNIQUE
+ *  5. fewer working sets than were prescribed            -> CONTINUE_CURRENT_LOAD
+ *  6. working sets hit repMax within RIR, RIR logged     -> INCREASE_LOAD (known load, else null + instruction; never invented)
+ *  7. weakest working set missed repMin at RIR <= 0      -> REDUCE_LOAD (same sourcing)
+ *  8. otherwise                                          -> CONTINUE_REP_PROGRESSION
+ * Achievement is judged against the PREVIOUS prescription; targets are
+ * expressed in the CURRENT one (identical once rule 3 passes).
  */
 export function computeProgressionTarget(input: ProgressionInput): ProgressionTarget {
-  const { recentSets, repMin, repMax, rirMin, rirMax, observedLoadsKg, prescribedSets } = input;
+  const { recentSets, observedLoadsKg, currentPrescription: current } = input;
+  const base = { targetRepMin: current.repMin, targetRepMax: current.repMax };
 
   if (recentSets.length === 0) {
+    if (input.hasHistoryInOtherContext) {
+      return {
+        targetLoadKg: null,
+        ...base,
+        reason: "CONTEXT_CHANGED",
+        loadInstruction: null,
+        message:
+          "You've done this exercise, but not in this training location — loads don't transfer between equipment. Choose a resistance that lets you complete the prescribed reps with the target RIR in reserve.",
+      };
+    }
     return {
       targetLoadKg: null,
-      targetRepMin: repMin,
-      targetRepMax: repMax,
+      ...base,
       reason: "NO_LOAD_HISTORY",
       loadInstruction: null,
       message:
@@ -118,13 +157,14 @@ export function computeProgressionTarget(input: ProgressionInput): ProgressionTa
     };
   }
 
-  const lastLoad = recentSets.at(-1)!.loadKg ?? null;
+  const previous = input.previousPrescription ?? current;
+  const { working, loadKg: workingLoad } = resolveWorkingSets(recentSets);
 
   if (recentSets.some((s) => s.painFlag === true)) {
     return {
-      targetLoadKg: lastLoad,
-      targetRepMin: repMin,
-      targetRepMax: repMin,
+      targetLoadKg: workingLoad,
+      targetRepMin: current.repMin,
+      targetRepMax: current.repMin,
       reason: "REASSESS_DUE_TO_PAIN",
       loadInstruction: null,
       message:
@@ -132,40 +172,49 @@ export function computeProgressionTarget(input: ProgressionInput): ProgressionTa
     };
   }
 
+  if (!samePrescription(previous, current)) {
+    return {
+      targetLoadKg: null,
+      ...base,
+      reason: "CONTEXT_CHANGED",
+      loadInstruction: null,
+      message:
+        "Your rep or RIR target for this exercise changed since last time, so last session's load doesn't carry over — choose a resistance that fits the new target.",
+    };
+  }
+
   if (recentSets.some((s) => s.techniqueValid === false)) {
     return {
-      targetLoadKg: lastLoad,
-      targetRepMin: repMin,
-      targetRepMax: repMax,
+      targetLoadKg: workingLoad,
+      ...base,
       reason: "HOLD_FOR_TECHNIQUE",
       loadInstruction: null,
       message: "Technique was marked invalid last session — repeat the same target and prioritize form before progressing.",
     };
   }
 
-  if (recentSets.length < prescribedSets) {
+  if (working.length < previous.sets) {
     return {
-      targetLoadKg: lastLoad,
-      targetRepMin: repMin,
-      targetRepMax: repMax,
+      targetLoadKg: workingLoad,
+      ...base,
       reason: "CONTINUE_CURRENT_LOAD",
       loadInstruction: null,
       message: "Last session was incomplete — repeat the same target before progressing.",
     };
   }
 
-  const worstReps = Math.min(...recentSets.map((s) => s.reps));
-  const upperRepTargetAchieved = recentSets.every((s) => s.reps >= repMax);
-  const rirMissing = recentSets.some((s) => s.rir === null);
-  const rirTargetSatisfied = recentSets.every((s) => s.rir !== null && s.rir >= rirMin && s.rir <= rirMax);
+  const bodyweight = workingLoad === null;
+  const worstReps = Math.min(...working.map((s) => s.reps));
+  const upperRepTargetAchieved = working.every((s) => s.reps >= previous.repMax);
+  const rirMissing = working.some((s) => s.rir === null);
+  const rirTargetSatisfied = working.every((s) => s.rir !== null && s.rir >= previous.rirMin && s.rir <= previous.rirMax);
 
   // A load increase needs evidence the rep ceiling was reached within the RIR
   // target; an unlogged RIR is no evidence, so repeat rather than guess.
   if (upperRepTargetAchieved && rirMissing) {
     return {
-      targetLoadKg: lastLoad,
-      targetRepMin: repMin,
-      targetRepMax: repMax,
+      targetLoadKg: workingLoad,
+      ...base,
       reason: "CONTINUE_CURRENT_LOAD",
       loadInstruction: null,
       message: "You hit the top of the rep range but didn't log RIR — log reps in reserve for every set so load can progress.",
@@ -173,42 +222,52 @@ export function computeProgressionTarget(input: ProgressionInput): ProgressionTa
   }
 
   if (upperRepTargetAchieved && rirTargetSatisfied) {
-    const nextLoad = lastLoad !== null ? resolveKnownNextLoad(observedLoadsKg, lastLoad, "up") : null;
+    const nextLoad = bodyweight ? null : resolveKnownNextLoad(observedLoadsKg, workingLoad, "up");
+    const instruction = bodyweight
+      ? "Add external load or move to a harder variation."
+      : nextLoad === null
+        ? "Increase to the smallest available resistance increment."
+        : null;
     return {
       targetLoadKg: nextLoad,
-      targetRepMin: repMin,
-      targetRepMax: repMax,
+      ...base,
       reason: "INCREASE_LOAD",
-      loadInstruction: nextLoad === null ? "Increase to the smallest available resistance increment." : null,
-      message:
-        nextLoad === null
+      loadInstruction: instruction,
+      message: bodyweight
+        ? "Hit the top of the rep range within the target RIR — time to progress. There's no external load to raise, so add some or move to a harder variation, then restart the rep range."
+        : nextLoad === null
           ? "Hit the top of the rep range within the target RIR — time to progress. Your next available increment isn't known yet, so move up by the smallest available step and restart the rep range."
           : "Hit the top of the rep range within the target RIR — increase to your next known load and restart the rep range.",
     };
   }
 
   const failedAtFloor =
-    worstReps < repMin && recentSets.some((s) => s.reps === worstReps && s.rir !== null && s.rir <= 0);
+    worstReps < previous.repMin && working.some((s) => s.reps === worstReps && s.rir !== null && s.rir <= 0);
   if (failedAtFloor) {
-    const nextLoad = lastLoad !== null ? resolveKnownNextLoad(observedLoadsKg, lastLoad, "down") : null;
+    const nextLoad = bodyweight ? null : resolveKnownNextLoad(observedLoadsKg, workingLoad, "down");
+    const instruction = bodyweight
+      ? "Use an easier variation or add assistance."
+      : nextLoad === null
+        ? "Reduce to the next lighter available resistance."
+        : null;
     return {
       targetLoadKg: nextLoad,
-      targetRepMin: repMin,
-      targetRepMax: repMax,
+      ...base,
       reason: "REDUCE_LOAD",
-      loadInstruction: nextLoad === null ? "Reduce to the next lighter available resistance." : null,
-      message:
-        nextLoad === null
+      loadInstruction: instruction,
+      message: bodyweight
+        ? "Fell below the rep floor at RIR 0 — drop to an easier variation and rebuild."
+        : nextLoad === null
           ? "Fell below the rep floor at RIR 0 — drop to the next lighter available resistance and rebuild."
           : "Fell below the rep floor at RIR 0 — reduce to your next known lighter load and rebuild.",
     };
   }
 
-  const nextReps = Math.max(repMin, Math.min(worstReps + 1, repMax));
+  const nextReps = Math.max(current.repMin, Math.min(worstReps + 1, current.repMax));
   return {
-    targetLoadKg: lastLoad,
+    targetLoadKg: workingLoad,
     targetRepMin: nextReps,
-    targetRepMax: repMax,
+    targetRepMax: current.repMax,
     reason: "CONTINUE_REP_PROGRESSION",
     loadInstruction: null,
     message: "Same load, one more rep than your weakest set last time.",

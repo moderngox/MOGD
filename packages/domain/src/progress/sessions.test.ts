@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { createTestDatabase } from "@mogd/db/testUtils";
 import { schema, type Database } from "@mogd/db";
 import { createExercise } from "../exercises/exerciseCatalog";
+import { createLocation, LocationNotFoundError } from "./locations";
 import {
   correctSet,
   deleteLastSet,
@@ -13,6 +14,7 @@ import {
   getSessionSummary,
   InvalidSetNumberError,
   logSet,
+  SessionLocationMismatchError,
   SessionNotFoundError,
   SetNotFoundError,
   WorkoutNotOwnedError,
@@ -61,6 +63,7 @@ describe("workout sessions", () => {
   const set = (setNumber: number, extra: Partial<LogSetInput> = {}): LogSetInput => ({
     workoutId,
     exerciseId,
+    locationId: null,
     setNumber,
     loadKg: 7.5,
     reps: 15,
@@ -73,7 +76,7 @@ describe("workout sessions", () => {
   it("resumes the same occurrence instead of starting another", async () => {
     await logSet(db, userId, set(1));
     await logSet(db, userId, set(2));
-    const again = await getOrStartPerformance(db, userId, workoutId, exerciseId);
+    const again = await getOrStartPerformance(db, userId, workoutId, exerciseId, null);
 
     expect(await db.select().from(schema.workoutSessions)).toHaveLength(1);
     expect(await db.select().from(schema.workoutExercisePerformances)).toHaveLength(1);
@@ -149,7 +152,7 @@ describe("workout sessions", () => {
   });
 
   it("returns false when there is no set to delete", async () => {
-    const { performance } = await getOrStartPerformance(db, userId, workoutId, exerciseId);
+    const { performance } = await getOrStartPerformance(db, userId, workoutId, exerciseId, null);
     expect(await deleteLastSet(db, userId, performance.id)).toBe(false);
   });
 
@@ -222,5 +225,30 @@ describe("workout sessions", () => {
       allowedSessionRoles: [],
     });
     await expect(logSet(db, userId, set(1, { exerciseId: other!.id }))).rejects.toThrow(ExerciseNotInWorkoutError);
+  });
+
+  describe("training location", () => {
+    it("fixes the occurrence's location when it starts", async () => {
+      const home = await createLocation(db, userId, "Home");
+      await logSet(db, userId, set(1, { locationId: home.id }));
+      const open = (await getInProgressSession(db, userId, workoutId))!;
+      expect(open.trainingLocationId).toBe(home.id);
+    });
+
+    it("rejects logging into an open occurrence under a different location", async () => {
+      const home = await createLocation(db, userId, "Home");
+      const gym = await createLocation(db, userId, "Gym");
+      await logSet(db, userId, set(1, { locationId: home.id }));
+
+      await expect(logSet(db, userId, set(2, { locationId: gym.id }))).rejects.toThrow(SessionLocationMismatchError);
+      await expect(logSet(db, userId, set(2, { locationId: null }))).rejects.toThrow(SessionLocationMismatchError);
+      expect(await allLogs()).toHaveLength(1);
+    });
+
+    it("rejects another user's location", async () => {
+      const theirs = await createLocation(db, otherUserId, "Their gym");
+      await expect(logSet(db, userId, set(1, { locationId: theirs.id }))).rejects.toThrow(LocationNotFoundError);
+      expect(await db.select().from(schema.workoutSessions)).toHaveLength(0);
+    });
   });
 });

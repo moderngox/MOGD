@@ -17,6 +17,7 @@ export {
   PROGRESSION_REASON_OPTIONS,
   resolveKnownNextLoad,
   type ProgressionInput,
+  type ProgressionPrescription,
   type ProgressionTarget,
   type ProgressionReason,
   type LoggedSetForProgression,

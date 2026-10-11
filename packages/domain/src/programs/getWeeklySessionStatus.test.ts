@@ -48,7 +48,7 @@ describe("getWeeklySessionStatus", () => {
   });
 
   it("marks a slot logged as soon as an occurrence has a set, without needing to finish it", async () => {
-    await logSet(db, userId, { workoutId: firstWorkoutId, exerciseId, setNumber: 1, reps: 10 });
+    await logSet(db, userId, { workoutId: firstWorkoutId, exerciseId, locationId: null, setNumber: 1, reps: 10 });
 
     const week = await getWeeklySessionStatus(db, userId);
     expect(week.map((w) => w.status)).toEqual(["logged", "today"]);

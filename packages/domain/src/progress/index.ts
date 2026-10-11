@@ -16,6 +16,7 @@ export {
   ExerciseNotInWorkoutError,
   InvalidSetNumberError,
   SessionNotFoundError,
+  SessionLocationMismatchError,
   SetNotFoundError,
   type LogSetInput,
   type SetCorrectionInput,
@@ -29,7 +30,19 @@ export {
   getRecentSessionPerformance,
   getObservedLoadsKg,
   getProgressionTargetForExercise,
-  type HistoryOptions,
+  hasHistoryInOtherContext,
+  type HistoryContext,
+  type PerformedPrescription,
+  type RecentSessionPerformance,
   type PreviousPerformance,
   type RecentSessionSet,
 } from "./previousPerformance";
+export {
+  createLocation,
+  listLocations,
+  getOwnedLocation,
+  getDefaultLocationId,
+  DuplicateLocationError,
+  LocationNotFoundError,
+  type TrainingLocation,
+} from "./locations";
