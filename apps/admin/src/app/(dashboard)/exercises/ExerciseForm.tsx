@@ -262,7 +262,8 @@ export function ExerciseForm({
       <Card title="Session Roles">
         <p className="text-xs text-fg-secondary">
           What this exercise CAN be used as. The engine assigns the actual role per generated
-          session — this is eligibility, not an assignment.
+          session — this is eligibility, not an assignment. A superset is a pair, so it needs a second
+          allowed role; it only happens when a compatible partner prefers superset too.
         </p>
         <div>
           <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-fg-secondary">

@@ -20,6 +20,8 @@ export interface ProgramWorkoutExerciseView {
   restSeconds: number;
   /** Null for workouts generated before this field existed (see schema). */
   sessionRole: SessionRole | null;
+  /** Shared by the two members of a superset pair; null otherwise. */
+  supersetGroupId: string | null;
   videoObjectKey: string | null;
   selectionReason: string;
 }
@@ -66,6 +68,7 @@ export async function getCurrentProgram(db: Database, userId: string): Promise<P
         rirMax: schema.workoutExercises.rirMax,
         restSeconds: schema.workoutExercises.restSeconds,
         sessionRole: schema.workoutExercises.sessionRole,
+        supersetGroupId: schema.workoutExercises.supersetGroupId,
         canonicalId: schema.exercises.canonicalId,
         name: schema.exercises.name,
         instructions: schema.exercises.instructions,
@@ -137,6 +140,7 @@ export async function getWorkout(db: Database, workoutId: string): Promise<Progr
       rirMax: schema.workoutExercises.rirMax,
       restSeconds: schema.workoutExercises.restSeconds,
       sessionRole: schema.workoutExercises.sessionRole,
+        supersetGroupId: schema.workoutExercises.supersetGroupId,
       canonicalId: schema.exercises.canonicalId,
       name: schema.exercises.name,
       instructions: schema.exercises.instructions,

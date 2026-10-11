@@ -160,6 +160,7 @@ export async function getOrStartPerformance(
         orderIndex: slot.orderIndex,
         sessionRole: slot.sessionRole,
         roleReason: slot.roleReason,
+        supersetGroupId: slot.supersetGroupId,
         sets: slot.sets,
         repMin: slot.repMin,
         repMax: slot.repMax,

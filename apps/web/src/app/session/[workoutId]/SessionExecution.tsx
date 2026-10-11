@@ -24,6 +24,8 @@ export interface SessionExerciseView {
   rirMax: number;
   restSeconds: number;
   sessionRole: string | null;
+  /** Shared by the two exercises of a superset pair; null otherwise. */
+  supersetGroupId: string | null;
   selectionReason: string;
   videoUrl: string | null;
   previousPerformance: { loadKg: number | null; reps: number } | null;
@@ -232,6 +234,20 @@ function ExerciseCard({
   );
 }
 
+/** Consecutive exercises sharing a superset group become one block; everything else stays a block of one. */
+function groupSupersets(exercises: SessionExerciseView[]): { supersetGroupId: string | null; exercises: SessionExerciseView[] }[] {
+  const blocks: { supersetGroupId: string | null; exercises: SessionExerciseView[] }[] = [];
+  for (const exercise of exercises) {
+    const last = blocks.at(-1);
+    if (exercise.supersetGroupId && last?.supersetGroupId === exercise.supersetGroupId) {
+      last.exercises.push(exercise);
+    } else {
+      blocks.push({ supersetGroupId: exercise.supersetGroupId, exercises: [exercise] });
+    }
+  }
+  return blocks;
+}
+
 function LocationPicker({
   locations,
   locationId,
@@ -348,15 +364,29 @@ export function SessionExecution({
         </Button>
       </div>
       <LocationPicker locations={locations} locationId={locationId} locked={locationLocked} />
-      {exercises.map((exercise) => (
-        <ExerciseCard
-          key={exercise.workoutExerciseId}
-          exercise={exercise}
-          workoutId={workoutId}
-          locationId={locationId}
-          onSessionStarted={setSessionId}
-        />
-      ))}
+      {groupSupersets(exercises).map((block) => {
+        const cards = block.exercises.map((exercise) => (
+          <ExerciseCard
+            key={exercise.workoutExerciseId}
+            exercise={exercise}
+            workoutId={workoutId}
+            locationId={locationId}
+            onSessionStarted={setSessionId}
+          />
+        ));
+        if (!block.supersetGroupId) return cards;
+        return (
+          <div
+            key={block.supersetGroupId}
+            className="flex flex-col gap-3 rounded-lg border border-sky-900 bg-sky-950/20 p-3"
+          >
+            <p className="text-sm font-medium text-sky-300">
+              Superset — alternate sets between the two, resting after each pair
+            </p>
+            {cards}
+          </div>
+        );
+      })}
       <Button onClick={finish} disabled={!sessionId || finishing}>
         {finishing ? "Finishing…" : "Finish workout"}
       </Button>

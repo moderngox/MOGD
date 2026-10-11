@@ -117,7 +117,7 @@ export default async function AdminUserDetailPage({
                 <ul className="mt-1 text-zinc-400">
                   {workout.exercises.map((ex) => (
                     <li key={ex.workoutExerciseId}>
-                      {ex.name} — {ex.sets} × {ex.repMin}-{ex.repMax} (RIR {ex.rirMin}-{ex.rirMax})
+                      {ex.name} — {ex.sets} × {ex.repMin}-{ex.repMax} (RIR {ex.rirMin}-{ex.rirMax}){ex.supersetGroupId ? " · superset" : ""}
                     </li>
                   ))}
                 </ul>

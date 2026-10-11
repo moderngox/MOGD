@@ -5,6 +5,7 @@ import type { SessionLabel } from "./splitTemplates";
 import { SESSION_MUSCLE_MAP } from "./splitTemplates";
 import type { EligibleExercise } from "./candidatePool";
 import { assignRole, assignSessionRoles, applyRoleModifier } from "./sessionRoleAssignment";
+import { pairSupersets, supersetSetBounds } from "./supersetPairing";
 import type { RoleReason } from "./sessionRoleAssignment";
 
 export interface AllocatedExercise {
@@ -22,6 +23,8 @@ export interface AllocatedExercise {
    * preferredSessionRole for what the exercise merely permits). */
   sessionRole: SessionRole;
   roleReason: RoleReason;
+  /** 0-based pair number shared by the two members of a superset; null otherwise. */
+  supersetGroupIndex: number | null;
 }
 
 /**
@@ -170,15 +173,26 @@ export function allocateSession(input: {
   const totalSetBudget = Math.max(minSetsFloor, Math.round(input.sessionDurationMinutes / MINUTES_PER_SET));
   const totalRelevance = selected.reduce((sum, s) => sum + Math.max(s.score, 0.01), 0);
 
-  const roles = assignSessionRoles(selected);
+  const paired = pairSupersets(selected, assignSessionRoles(selected));
+  const ordered = paired.selected;
+  const roles = paired.roles;
 
-  return selected.map((s, index) => {
+  // Each member's own share-based set count; a superset pair then shares one.
+  const plannedSets = ordered.map((s) => {
     const profile = s.exercise.programmingProfile;
     const share = Math.max(s.score, 0.01) / totalRelevance;
-    const sets = Math.min(
-      profile.setsMax,
-      Math.max(profile.setsMin, Math.round(totalSetBudget * share)),
-    );
+    return Math.min(profile.setsMax, Math.max(profile.setsMin, Math.round(totalSetBudget * share)));
+  });
+  for (const group of new Set(paired.groupIndexes.filter((g): g is number => g !== null))) {
+    const members = paired.groupIndexes.flatMap((g, i) => (g === group ? [i] : []));
+    const bounds = supersetSetBounds(ordered[members[0]!]!.exercise, ordered[members[1]!]!.exercise)!;
+    const common = Math.min(bounds.max, Math.max(bounds.min, Math.min(...members.map((i) => plannedSets[i]!))));
+    for (const i of members) plannedSets[i] = common;
+  }
+
+  return ordered.map((s, index) => {
+    const profile = s.exercise.programmingProfile;
+    const sets = plannedSets[index]!;
     const restSeconds = LARGE_REST_PATTERNS.has(s.exercise.movementPattern)
       ? profile.restSecondsMax
       : profile.restSecondsMin;
@@ -201,6 +215,7 @@ export function allocateSession(input: {
       ...contextual,
       sessionRole: role,
       roleReason,
+      supersetGroupIndex: paired.groupIndexes[index]!,
     };
   });
 }

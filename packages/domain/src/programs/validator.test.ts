@@ -1,6 +1,7 @@
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import { createTestDatabase } from "@mogd/db/testUtils";
-import { type Database } from "@mogd/db";
+import { eq } from "drizzle-orm";
+import { schema, type Database } from "@mogd/db";
 import { createExercise } from "../exercises/exerciseCatalog";
 import { upsertProgrammingProfile } from "../exercises/programmingProfiles";
 import { validateProgram, type ProgramPlan } from "./validator";
@@ -60,6 +61,7 @@ describe("validateProgram", () => {
               restSeconds: 90,
               sessionRole: "main",
               roleReason: "STRONGEST_MAIN_CANDIDATE",
+              supersetGroupIndex: null,
             },
           ],
         },
@@ -156,5 +158,113 @@ describe("validateProgram", () => {
     const result = await validateProgram(db, basePlan());
     expect(result.valid).toBe(false);
     expect(result.reasons.some((r) => r.includes("no enabled programming profile"))).toBe(true);
+  });
+
+  describe("superset groups", () => {
+    let aId: string;
+    let bId: string;
+
+    beforeEach(async () => {
+      const make = async (canonicalId: string, muscle: "lateral_deltoids" | "triceps") =>
+        (await createExercise(db, {
+          canonicalId,
+          name: canonicalId,
+          movementPattern: "isolation",
+          difficulty: "beginner",
+          primaryMuscles: [muscle],
+          secondaryMuscles: [],
+          equipment: ["dumbbells"],
+          contraindicationTags: [],
+          isActive: true,
+          allowedSessionRoles: ["accessory", "superset"],
+        }))!;
+      aId = (await make("cable_lateral_raise", "lateral_deltoids")).id;
+      bId = (await make("triceps_pushdown", "triceps")).id;
+    });
+
+    function pairPlan(patch: (members: ProgramPlan["workouts"][0]["exercises"]) => void = () => {}): ProgramPlan {
+      const member = (id: string, canonicalId: string, orderIndex: number) => ({
+        exerciseId: id,
+        canonicalId,
+        orderIndex,
+        sets: 3,
+        repMin: 12,
+        repMax: 15,
+        rirMin: 1,
+        rirMax: 3,
+        restSeconds: 45,
+        sessionRole: "superset" as const,
+        roleReason: "SUPERSET_PAIR" as const,
+        supersetGroupIndex: 0,
+      });
+      const members = [member(aId, "cable_lateral_raise", 0), member(bId, "triceps_pushdown", 1)];
+      patch(members);
+      return { ...basePlan({ sessionDurationMinutes: 25 }), workouts: [{ dayIndex: 0, sessionLabel: "push", exercises: members }] };
+    }
+
+    const rejects = async (plan: ProgramPlan, fragment: string) => {
+      const result = await validateProgram(db, plan);
+      expect(result.valid).toBe(false);
+      expect(result.reasons.some((r) => r.includes(fragment))).toBe(true);
+    };
+
+    it("accepts a well-formed pair", async () => {
+      expect(await validateProgram(db, pairPlan())).toEqual({ valid: true, reasons: [] });
+    });
+
+    it("rejects a superset with no partner", async () => {
+      await rejects(
+        pairPlan((m) => {
+          m[0]!.supersetGroupIndex = null;
+        }),
+        "no partner",
+      );
+    });
+
+    it("rejects a group with a single member", async () => {
+      await rejects(
+        pairPlan((m) => {
+          m.pop();
+        }),
+        "exactly two",
+      );
+    });
+
+    it("rejects a pair that isn't adjacent", async () => {
+      await rejects(
+        pairPlan((m) => {
+          m[1]!.orderIndex = 3;
+        }),
+        "isn't adjacent",
+      );
+    });
+
+    it("rejects unequal set counts", async () => {
+      await rejects(
+        pairPlan((m) => {
+          m[1]!.sets = 2;
+        }),
+        "unequal set counts",
+      );
+    });
+
+    it("rejects a pair that isn't compatible (overlapping muscles)", async () => {
+      await db.update(schema.exercises).set({ primaryMuscles: ["lateral_deltoids"] }).where(eq(schema.exercises.id, bId));
+      await rejects(pairPlan(), "isn't compatible");
+    });
+
+    it("rejects a group member that isn't eligible for superset", async () => {
+      await db.update(schema.exercises).set({ allowedSessionRoles: ["accessory"] }).where(eq(schema.exercises.id, bId));
+      await rejects(pairPlan(), "not eligible");
+    });
+
+    it("rejects a superset group on a non-superset role", async () => {
+      await rejects(
+        pairPlan((m) => {
+          m[1]!.sessionRole = "accessory";
+        }),
+        "in a superset group but has role",
+      );
+    });
   });
 });

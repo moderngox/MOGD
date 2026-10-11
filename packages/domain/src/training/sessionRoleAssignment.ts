@@ -14,6 +14,8 @@ export const ROLE_REASON_OPTIONS = [
   "TAIL_POSITION_FINISHER",
   "DEFAULT_ACCESSORY_FALLBACK",
   "NO_CONFIG_DEFAULT_ACCESSORY",
+  // Both members of a superset pair; set only by training/supersetPairing.ts.
+  "SUPERSET_PAIR",
 ] as const;
 export type RoleReason = (typeof ROLE_REASON_OPTIONS)[number];
 
@@ -82,12 +84,15 @@ export interface RoleAssignmentState {
 /** Roles an exercise may take right now: its configured eligibility (accessory-only
  * when unconfigured), minus "main" once the main slot is full and minus "finisher"
  * above the fatigue ceiling — those two constraints hold on every branch, not just
- * the default one. */
+ * the default one. "superset" is never offered here: a superset is two exercises
+ * done back to back, so it is only ever the outcome of the pairing pass
+ * (training/supersetPairing.ts), which promotes accessories. */
 export function legalRolesFor(exercise: CatalogExercise, state: RoleAssignmentState): SessionRole[] {
   const configured = exercise.allowedSessionRoles as SessionRole[];
   const allowed: SessionRole[] = configured.length === 0 ? ["accessory"] : configured;
   return allowed.filter(
     (role) =>
+      role !== "superset" &&
       !(role === "main" && state.mainSlotsFilled >= MAX_MAIN_SLOTS_PER_SESSION) &&
       !(role === "finisher" && (exercise.fatigueScore ?? 0) > FINISHER_FATIGUE_CEILING),
   );

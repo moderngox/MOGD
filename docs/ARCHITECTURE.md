@@ -251,6 +251,8 @@ interface ExerciseProgrammingProfile {
 }
 ```
 
+**Supersets** are pairs, decided by a pairing pass over the whole session (`training/supersetPairing.ts`), never assigned to one exercise on its own. Two exercises pair only if both allow `superset`, would otherwise be accessories, train disjoint primary muscles (neither's primary is the other's secondary), stay under the member and combined fatigue ceilings, and can share a set count; a pair forms only when at least one member *prefers* superset (admin intent is the trigger), at most one per session. Members sit adjacent, share a `supersetGroupId` and one set count, and use the superset rest modifier. `superset` can't be an exercise's only allowed role, so an unpaired exercise always has a role to fall back to.
+
 A generated `WorkoutExercise` row resolves the applicable profile for the user's level, applies a session-role modifier (main/accessory/superset/finisher) on top, and persists the resulting sets/reps/RIR-range/rest directly on the row as a snapshot — never a universal fixed prescription, and never regenerated retroactively when admin later edits a profile.
 
 ---

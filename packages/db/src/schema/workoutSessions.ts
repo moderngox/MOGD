@@ -16,6 +16,7 @@ const ROLE_REASON_VALUES = [
   "TAIL_POSITION_FINISHER",
   "DEFAULT_ACCESSORY_FALLBACK",
   "NO_CONFIG_DEFAULT_ACCESSORY",
+  "SUPERSET_PAIR",
 ] as const;
 const PROGRESSION_REASON_VALUES = [
   "NO_LOAD_HISTORY",
@@ -87,6 +88,8 @@ export const workoutExercisePerformances = sqliteTable(
     orderIndex: integer("orderIndex").notNull(),
     sessionRole: text("sessionRole", { enum: SESSION_ROLE_VALUES }),
     roleReason: text("roleReason", { enum: ROLE_REASON_VALUES }),
+    // Copied from the slot, so a finished workout still shows what was paired after regeneration.
+    supersetGroupId: text("supersetGroupId"),
     sets: integer("sets").notNull(),
     repMin: integer("repMin").notNull(),
     repMax: integer("repMax").notNull(),

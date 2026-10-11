@@ -37,6 +37,7 @@ export default async function ProgramPage() {
                 </p>
                 <p className="text-sm text-zinc-500">
                   {workout.exercises.length} exercises · ~{workout.estimatedDurationMinutes} min
+                  {new Set(workout.exercises.map((e) => e.supersetGroupId).filter(Boolean)).size > 0 && " · includes a superset"}
                 </p>
               </div>
               <Link href={`/session/${workout.workoutId}`}>

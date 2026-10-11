@@ -124,6 +124,13 @@ describe("workout sessions", () => {
     expect(latest.loadInstruction).toBeTruthy();
   });
 
+  it("copies the superset group onto the performance snapshot", async () => {
+    await db.update(schema.workoutExercises).set({ supersetGroupId: "pair-1" }).where(eq(schema.workoutExercises.workoutId, workoutId));
+    await logSet(db, userId, set(1));
+    const [performance] = await db.select().from(schema.workoutExercisePerformances);
+    expect(performance!.supersetGroupId).toBe("pair-1");
+  });
+
   it("treats a retried set as a no-op and a changed payload as a correction", async () => {
     await logSet(db, userId, set(1, { reps: 12 }));
     await logSet(db, userId, set(1, { reps: 12 }));

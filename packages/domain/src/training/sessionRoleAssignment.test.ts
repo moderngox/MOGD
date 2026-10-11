@@ -108,6 +108,20 @@ describe("assignSessionRoles", () => {
     expect(() => assignSessionRoles(scored([first, second]))).toThrow(UnassignableRoleError);
   });
 
+  it("never assigns superset on its own, even when preferred — only the pairing pass does", () => {
+    const preferred = mockExercise({
+      allowedSessionRoles: ["accessory", "superset"],
+      preferredSessionRole: "superset",
+    });
+    const [result] = assignSessionRoles(scored([preferred]));
+    expect(result).toEqual({ role: "accessory", roleReason: "DEFAULT_ACCESSORY_FALLBACK" });
+  });
+
+  it("rejects an exercise whose only legal role would have been superset", () => {
+    const supersetOnly = mockExercise({ allowedSessionRoles: ["superset"] });
+    expect(() => assignSessionRoles(scored([supersetOnly]))).toThrow(UnassignableRoleError);
+  });
+
   it("assigns a main-only exercise as main while the slot is open", () => {
     const [result] = assignSessionRoles(scored([mockExercise({ allowedSessionRoles: ["main"] })]));
     expect(result).toEqual({ role: "main", roleReason: "ONLY_ELIGIBLE_ROLE" });

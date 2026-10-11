@@ -1,0 +1,1 @@
+ALTER TABLE `workout_exercise_performance` ADD `supersetGroupId` text;

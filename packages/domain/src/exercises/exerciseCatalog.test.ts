@@ -87,4 +87,17 @@ describe("exerciseCatalog", () => {
     expect(await listExercises(db)).toHaveLength(2);
     expect(await listExercises(db, { activeOnly: true })).toHaveLength(1);
   });
+
+  it("rejects superset as the only allowed role, but accepts it alongside another", async () => {
+    await expect(createExercise(db, { ...validInput, allowedSessionRoles: ["superset"] })).rejects.toThrow(
+      /second role/,
+    );
+
+    const ok = await createExercise(db, { ...validInput, allowedSessionRoles: ["accessory", "superset"] });
+    expect(ok!.allowedSessionRoles).toEqual(["accessory", "superset"]);
+
+    await expect(
+      updateExercise(db, ok!.id, { ...validInput, allowedSessionRoles: ["superset"] }),
+    ).rejects.toThrow(/second role/);
+  });
 });

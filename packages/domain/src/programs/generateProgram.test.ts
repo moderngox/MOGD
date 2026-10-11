@@ -266,3 +266,63 @@ describe("generateProgram", () => {
     expect(await db.select().from(schema.exerciseLogs)).toHaveLength(1);
   });
 });
+
+describe("generateProgram supersets", () => {
+  let db: Database;
+  let close: () => void;
+
+  beforeEach(async () => {
+    const testDb = await createTestDatabase();
+    db = testDb.db;
+    close = testDb.close;
+    const make = (canonicalId: string, muscle: "upper_chest" | "lateral_deltoids" | "triceps", extra: Partial<CreateExerciseInput>) =>
+      createExercise(db, {
+        canonicalId,
+        name: canonicalId,
+        movementPattern: "isolation",
+        difficulty: "beginner",
+        primaryMuscles: [muscle],
+        secondaryMuscles: [],
+        equipment: ["dumbbells"],
+        contraindicationTags: [],
+        isActive: true,
+        allowedSessionRoles: ["accessory", "superset"],
+        ...extra,
+      });
+    await make("incline_dumbbell_press", "upper_chest", { allowedSessionRoles: ["main", "accessory"], hypertrophyScore: 10 });
+    await make("cable_lateral_raise", "lateral_deltoids", { preferredSessionRole: "superset" });
+    await make("triceps_pushdown", "triceps", { preferredSessionRole: "superset" });
+  });
+
+  afterEach(() => close());
+
+  it("persists a preferred-superset pair with one shared group id, adjacent, equal sets", async () => {
+    const userId = await seedUser(db);
+    await generateStrategyAndNutrition(db, userId);
+    const result = await generateProgram(db, userId);
+    expect(result.success).toBe(true);
+
+    const workouts = await db.select().from(schema.workouts);
+    for (const workout of workouts) {
+      const rows = await db
+        .select()
+        .from(schema.workoutExercises)
+        .where(eq(schema.workoutExercises.workoutId, workout.id))
+        .orderBy(schema.workoutExercises.orderIndex);
+
+      const members = rows.filter((r) => r.sessionRole === "superset");
+      expect(members).toHaveLength(2);
+      expect(members[0]!.supersetGroupId).toBeTruthy();
+      expect(members[0]!.supersetGroupId).toBe(members[1]!.supersetGroupId);
+      expect(members.every((m) => m.roleReason === "SUPERSET_PAIR")).toBe(true);
+      expect(members[1]!.orderIndex - members[0]!.orderIndex).toBe(1);
+      expect(members[0]!.sets).toBe(members[1]!.sets);
+      expect(rows.filter((r) => r.sessionRole !== "superset").every((r) => r.supersetGroupId === null)).toBe(true);
+    }
+    // A different workout gets its own group id.
+    const ids = new Set(
+      (await db.select().from(schema.workoutExercises)).map((r) => r.supersetGroupId).filter(Boolean),
+    );
+    expect(ids.size).toBe(workouts.length);
+  });
+});

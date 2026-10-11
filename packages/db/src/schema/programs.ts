@@ -75,9 +75,10 @@ export const workoutExercises = sqliteTable("workout_exercise", {
       "TAIL_POSITION_FINISHER",
       "DEFAULT_ACCESSORY_FALLBACK",
       "NO_CONFIG_DEFAULT_ACCESSORY",
+      "SUPERSET_PAIR",
     ],
   }),
-  // Unused by the engine yet (superset ships unpaired in v1) — reserved so a
-  // future pairing pass has somewhere to write without another migration.
+  // Shared by the two exercises of a superset pair (one fresh uuid per pair per
+  // workout); null for every non-superset exercise.
   supersetGroupId: text("supersetGroupId"),
 });

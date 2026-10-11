@@ -125,6 +125,14 @@ export async function generateProgram(db: Database, userId: string): Promise<Gen
         })
         .returning({ id: schema.workouts.id });
 
+      // One fresh id per superset pair, shared by its two members.
+      const groupIds = new Map<number, string>();
+      for (const exercise of workout.exercises) {
+        if (exercise.supersetGroupIndex !== null && !groupIds.has(exercise.supersetGroupIndex)) {
+          groupIds.set(exercise.supersetGroupIndex, crypto.randomUUID());
+        }
+      }
+
       for (const exercise of workout.exercises) {
         await tx.insert(schema.workoutExercises).values({
           workoutId: createdWorkout!.id,
@@ -138,9 +146,8 @@ export async function generateProgram(db: Database, userId: string): Promise<Gen
           restSeconds: exercise.restSeconds,
           sessionRole: exercise.sessionRole,
           roleReason: exercise.roleReason,
-          // Unpopulated in v1 — superset ships as an assignable-but-unpaired
-          // role (docs/MOGD_06-session-role-architecture.md); column is
-          // reserved for a future pairing pass.
+          supersetGroupId:
+            exercise.supersetGroupIndex === null ? null : groupIds.get(exercise.supersetGroupIndex)!,
         });
       }
     }

@@ -282,4 +282,101 @@ describe("allocateSession", () => {
     };
     expect(allocateSession(args)).toEqual(allocateSession(args));
   });
+
+  describe("superset pairing", () => {
+    const push = (overrides: Partial<Parameters<typeof mockExercise>[0]> & { canonicalId: string }) =>
+      mockExercise({ allowedSessionRoles: ["accessory", "superset"], ...overrides });
+
+    const volume = {
+      upper_chest: 14,
+      lateral_deltoids: 14,
+      triceps: 14,
+    } as Record<CanonicalMuscleGroup, number>;
+
+    function candidates(prefer: boolean) {
+      return [
+        mockExercise({
+          canonicalId: "bench",
+          allowedSessionRoles: ["main", "accessory"],
+          primaryMuscles: ["upper_chest"] as CanonicalMuscleGroup[],
+          hypertrophyScore: 10,
+          programmingProfile: { setsMin: 2, setsMax: 4 },
+        }),
+        push({
+          canonicalId: "lateral_raise",
+          primaryMuscles: ["lateral_deltoids"] as CanonicalMuscleGroup[],
+          preferredSessionRole: prefer ? "superset" : null,
+          programmingProfile: { setsMin: 2, setsMax: 4 },
+        }),
+        push({
+          canonicalId: "triceps_pushdown",
+          primaryMuscles: ["triceps"] as CanonicalMuscleGroup[],
+          preferredSessionRole: prefer ? "superset" : null,
+          programmingProfile: { setsMin: 2, setsMax: 4 },
+        }),
+      ];
+    }
+
+    const allocate = (prefer: boolean) =>
+      allocateSession({
+        sessionLabel: "push",
+        candidates: candidates(prefer),
+        weeklyVolumeTargets: volume,
+        trainingBias: { hypertrophy: 0.75, strength: 0.25 },
+        sessionDurationMinutes: 30,
+      });
+
+    it("pairs the two preferred-superset exercises: adjacent, one group, equal sets, halved-ish rest", () => {
+      const result = allocate(true);
+      const members = result.filter((e) => e.sessionRole === "superset");
+
+      expect(members.map((m) => m.canonicalId).sort()).toEqual(["lateral_raise", "triceps_pushdown"]);
+      expect(members[0]!.supersetGroupIndex).toBe(0);
+      expect(members[1]!.supersetGroupIndex).toBe(0);
+      expect(members.every((m) => m.roleReason === "SUPERSET_PAIR")).toBe(true);
+      expect(Math.abs(members[0]!.orderIndex - members[1]!.orderIndex)).toBe(1);
+      expect(members[0]!.sets).toBe(members[1]!.sets);
+      // Superset rest modifier is 0.7 of the isolation baseline (profile restSecondsMin 75).
+      expect(members[0]!.restSeconds).toBeLessThan(75);
+      expect(result.find((e) => e.canonicalId === "bench")!.sessionRole).toBe("main");
+    });
+
+    it("pairs nothing when no one prefers superset", () => {
+      const result = allocate(false);
+      expect(result.every((e) => e.supersetGroupIndex === null)).toBe(true);
+      expect(result.some((e) => e.sessionRole === "superset")).toBe(false);
+    });
+
+    it("gives a pair one shared set count inside both profiles' ranges", () => {
+      const result = allocateSession({
+        sessionLabel: "push",
+        candidates: [
+          mockExercise({
+            canonicalId: "bench",
+            allowedSessionRoles: ["main", "accessory"],
+            primaryMuscles: ["upper_chest"] as CanonicalMuscleGroup[],
+            hypertrophyScore: 10,
+          }),
+          push({
+            canonicalId: "lateral_raise",
+            primaryMuscles: ["lateral_deltoids"] as CanonicalMuscleGroup[],
+            preferredSessionRole: "superset",
+            programmingProfile: { setsMin: 3, setsMax: 5 },
+          }),
+          push({
+            canonicalId: "triceps_pushdown",
+            primaryMuscles: ["triceps"] as CanonicalMuscleGroup[],
+            programmingProfile: { setsMin: 2, setsMax: 3 },
+          }),
+        ],
+        weeklyVolumeTargets: volume,
+        trainingBias: { hypertrophy: 0.75, strength: 0.25 },
+        sessionDurationMinutes: 30,
+      });
+      const members = result.filter((e) => e.sessionRole === "superset");
+      expect(members).toHaveLength(2);
+      expect(members[0]!.sets).toBe(3); // the only count both ranges allow
+      expect(members[1]!.sets).toBe(3);
+    });
+  });
 });

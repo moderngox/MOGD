@@ -4,6 +4,13 @@ import { resolveActiveExercise } from "../exercises/exerciseCatalog";
 import { listProgrammingProfiles, resolveApplicableProfile } from "../exercises/programmingProfiles";
 import { MINUTES_PER_SET } from "../training/sessionAllocation";
 import { FINISHER_FATIGUE_CEILING, MAX_MAIN_SLOTS_PER_SESSION } from "../training/sessionRoleAssignment";
+import {
+  allowsSuperset,
+  areSupersetCompatible,
+  MAX_SUPERSET_PAIRS_PER_SESSION,
+  SUPERSET_MEMBER_FATIGUE_CEILING,
+  type SupersetExercise,
+} from "../training/supersetPairing";
 import type { SessionLabel } from "../training/splitTemplates";
 import type { AllocatedExercise } from "../training/sessionAllocation";
 
@@ -31,6 +38,61 @@ export interface ValidationResult {
 // near-empty session slipping through.
 const DURATION_OVERSHOOT_TOLERANCE = 0.15;
 const DURATION_UNDERSHOOT_FLOOR = 0.5;
+
+/**
+ * A superset is exactly two adjacent exercises, both role "superset", sharing a
+ * group, eligible and compatible, doing the same number of sets — re-derived
+ * here with the same pure rules the generator used, never trusted from it.
+ */
+function validateSupersets(
+  workout: ProgramWorkoutPlan,
+  resolvedByOrder: Map<number, SupersetExercise>,
+  reasons: string[],
+): void {
+  const day = `Day ${workout.dayIndex}`;
+  const groups = new Map<number, AllocatedExercise[]>();
+
+  for (const exercise of workout.exercises) {
+    if (exercise.supersetGroupIndex === null) {
+      if (exercise.sessionRole === "superset") {
+        reasons.push(`${day}: "${exercise.canonicalId}" is a superset with no partner.`);
+      }
+      continue;
+    }
+    if (exercise.sessionRole !== "superset") {
+      reasons.push(`${day}: "${exercise.canonicalId}" is in a superset group but has role "${exercise.sessionRole}".`);
+    }
+    groups.set(exercise.supersetGroupIndex, [...(groups.get(exercise.supersetGroupIndex) ?? []), exercise]);
+  }
+
+  if (groups.size > MAX_SUPERSET_PAIRS_PER_SESSION) {
+    reasons.push(`${day} has ${groups.size} supersets, over the limit of ${MAX_SUPERSET_PAIRS_PER_SESSION}.`);
+  }
+
+  for (const members of groups.values()) {
+    if (members.length !== 2) {
+      reasons.push(`${day}: a superset must be exactly two exercises, found ${members.length}.`);
+      continue;
+    }
+    const [a, b] = members as [AllocatedExercise, AllocatedExercise];
+    const label = `"${a.canonicalId}" / "${b.canonicalId}"`;
+
+    if (Math.abs(a.orderIndex - b.orderIndex) !== 1) reasons.push(`${day}: superset ${label} isn't adjacent.`);
+    if (a.sets !== b.sets) reasons.push(`${day}: superset ${label} has unequal set counts (${a.sets} vs ${b.sets}).`);
+
+    const resolvedA = resolvedByOrder.get(a.orderIndex);
+    const resolvedB = resolvedByOrder.get(b.orderIndex);
+    if (!resolvedA || !resolvedB) continue; // already reported as unresolved / no profile
+
+    for (const [exercise, resolved] of [[a, resolvedA], [b, resolvedB]] as const) {
+      if (!allowsSuperset(resolved)) reasons.push(`${day}: "${exercise.canonicalId}" is not eligible for superset.`);
+      if ((resolved.fatigueScore ?? 0) > SUPERSET_MEMBER_FATIGUE_CEILING) {
+        reasons.push(`${day}: "${exercise.canonicalId}" is too fatiguing for a superset.`);
+      }
+    }
+    if (!areSupersetCompatible(resolvedA, resolvedB)) reasons.push(`${day}: superset ${label} isn't compatible.`);
+  }
+}
 
 /**
  * Independently re-derives and re-checks every invariant the upstream
@@ -75,6 +137,8 @@ export async function validateProgram(db: Database, plan: ProgramPlan): Promise<
         `Day ${workout.dayIndex} is estimated at only ${estimatedMinutes} min, below the ${Math.round(min)} min floor for a ${plan.sessionDurationMinutes} min session.`,
       );
     }
+
+    const checked = new Map<number, SupersetExercise>();
 
     for (const exercise of workout.exercises) {
       // Re-resolve against the live catalog — never trust that a
@@ -122,7 +186,11 @@ export async function validateProgram(db: Database, plan: ProgramPlan): Promise<
           `"${exercise.canonicalId}" has ${exercise.sets} sets, outside the ${profile.setsMin}-${profile.setsMax} bounds for this profile.`,
         );
       }
+
+      if (profile) checked.set(exercise.orderIndex, { ...resolved, programmingProfile: profile });
     }
+
+    validateSupersets(workout, checked, reasons);
   }
 
   return { valid: reasons.length === 0, reasons };

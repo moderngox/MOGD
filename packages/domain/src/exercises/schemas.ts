@@ -64,13 +64,28 @@ const REFINE_OPTIONS: { message: string; path: (string | number)[] } = {
   path: ["preferredSessionRole"],
 };
 
-export const createExerciseInput = exerciseFields.refine(preferredRoleMustBeAllowed, REFINE_OPTIONS);
+/**
+ * A superset is a pair, so "superset" can't be an exercise's only allowed role —
+ * with no partner available it would have nothing to fall back to.
+ */
+function supersetNeedsAnotherRole(data: { allowedSessionRoles: string[] }) {
+  return !data.allowedSessionRoles.includes("superset") || data.allowedSessionRoles.length > 1;
+}
+const SUPERSET_REFINE_OPTIONS: { message: string; path: (string | number)[] } = {
+  message: "Superset can't be the only allowed role — it needs a second role to fall back to when there's no partner",
+  path: ["allowedSessionRoles"],
+};
+
+export const createExerciseInput = exerciseFields
+  .refine(preferredRoleMustBeAllowed, REFINE_OPTIONS)
+  .refine(supersetNeedsAnotherRole, SUPERSET_REFINE_OPTIONS);
 export type CreateExerciseInput = z.infer<typeof createExerciseInput>;
 
 /** Same fields, minus the immutable canonicalId. */
 export const updateExerciseInput = exerciseFields
   .omit({ canonicalId: true })
-  .refine(preferredRoleMustBeAllowed, REFINE_OPTIONS);
+  .refine(preferredRoleMustBeAllowed, REFINE_OPTIONS)
+  .refine(supersetNeedsAnotherRole, SUPERSET_REFINE_OPTIONS);
 export type UpdateExerciseInput = z.infer<typeof updateExerciseInput>;
 
 export const createDraftAssetInput = z.object({

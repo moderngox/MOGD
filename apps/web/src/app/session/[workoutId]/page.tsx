@@ -97,6 +97,7 @@ export default async function SessionPage({
       rirMax: prescription.rirMax,
       restSeconds: prescription.restSeconds,
       sessionRole: performance?.sessionRole ?? exercise.sessionRole,
+      supersetGroupId: performance?.supersetGroupId ?? exercise.supersetGroupId,
       selectionReason: exercise.selectionReason,
       videoUrl:
         env && exercise.videoObjectKey
