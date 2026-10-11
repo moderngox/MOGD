@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assignSessionRoles, applyRoleModifier } from "./sessionRoleAssignment";
+import { assignSessionRoles, applyRoleModifier, UnassignableRoleError } from "./sessionRoleAssignment";
 import type { CatalogExercise } from "./candidatePool";
 
 let counter = 0;
@@ -84,6 +84,33 @@ describe("assignSessionRoles", () => {
     const exercises = [mockExercise(), mockExercise(), mockExercise()];
     const input = scored(exercises);
     expect(assignSessionRoles(input)).toEqual(assignSessionRoles(input));
+  });
+
+  it("never honors a preferred finisher above the fatigue ceiling", () => {
+    const main = mockExercise();
+    const fatiguing = mockExercise({
+      allowedSessionRoles: ["accessory", "finisher"],
+      preferredSessionRole: "finisher",
+      fatigueScore: 9,
+    });
+    const [, last] = assignSessionRoles(scored([main, fatiguing]));
+    expect(last!.role).toBe("accessory");
+  });
+
+  it("rejects a finisher-only exercise above the fatigue ceiling instead of assigning it", () => {
+    const fatiguing = mockExercise({ allowedSessionRoles: ["finisher"], fatigueScore: 9 });
+    expect(() => assignSessionRoles(scored([fatiguing]))).toThrow(UnassignableRoleError);
+  });
+
+  it("enforces the one-main limit even for main-only exercises", () => {
+    const first = mockExercise({ allowedSessionRoles: ["main"] });
+    const second = mockExercise({ allowedSessionRoles: ["main"] });
+    expect(() => assignSessionRoles(scored([first, second]))).toThrow(UnassignableRoleError);
+  });
+
+  it("assigns a main-only exercise as main while the slot is open", () => {
+    const [result] = assignSessionRoles(scored([mockExercise({ allowedSessionRoles: ["main"] })]));
+    expect(result).toEqual({ role: "main", roleReason: "ONLY_ELIGIBLE_ROLE" });
   });
 });
 

@@ -26,7 +26,7 @@ describe("validateProgram", () => {
       equipment: ["dumbbells"],
       contraindicationTags: [],
       isActive: true,
-      allowedSessionRoles: [],
+      allowedSessionRoles: ["main", "accessory"],
     });
     exerciseId = exercise!.id;
     canonicalId = exercise!.canonicalId;
@@ -118,6 +118,23 @@ describe("validateProgram", () => {
     const result = await validateProgram(db, plan);
     expect(result.valid).toBe(false);
     expect(result.reasons.some((r) => r.includes("bounds"))).toBe(true);
+  });
+
+  it("rejects an assigned role the exercise isn't eligible for", async () => {
+    const plan = basePlan();
+    plan.workouts[0]!.exercises[0]!.sessionRole = "finisher";
+    const result = await validateProgram(db, plan);
+    expect(result.valid).toBe(false);
+    expect(result.reasons.some((r) => r.includes("not eligible"))).toBe(true);
+  });
+
+  it("rejects more than one main exercise in a session", async () => {
+    const plan = basePlan({ sessionDurationMinutes: 30 });
+    const first = plan.workouts[0]!.exercises[0]!;
+    plan.workouts[0]!.exercises.push({ ...first, orderIndex: 1 });
+    const result = await validateProgram(db, plan);
+    expect(result.valid).toBe(false);
+    expect(result.reasons.some((r) => r.includes("main exercises"))).toBe(true);
   });
 
   it("rejects an exercise with no enabled programming profile for the plan's experience level", async () => {

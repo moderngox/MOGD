@@ -120,4 +120,33 @@ describe("progress logging and previous performance", () => {
     expect(recent).toHaveLength(2);
     expect(recent.every((s) => s.loadKg === 32.5)).toBe(true);
   });
+
+  describe("increment inferred from logged history", () => {
+    const prescription = { sets: 3, repMin: 12, repMax: 15, rirMin: 1, rirMax: 3 };
+
+    async function logCeilingSession(loadKg: number) {
+      for (const setNumber of [1, 2, 3]) {
+        await logWorkoutSet(db, userId, { exerciseId, setNumber, loadKg, reps: 15, rir: 2 });
+      }
+    }
+
+    it("requests the smallest available increment (null kg) when only one load has ever been used", async () => {
+      await logCeilingSession(7.5);
+      const target = await getProgressionTargetForExercise(db, userId, exerciseId, prescription);
+      expect(target).toMatchObject({ reason: "INCREASE_LOAD", targetLoadKg: null });
+      expect(target.loadInstruction).toBeTruthy();
+    });
+
+    it("uses the step observed between earlier sessions", async () => {
+      await logWorkoutSet(db, userId, { exerciseId, setNumber: 1, loadKg: 5, reps: 12, rir: 2 });
+      await db
+        .update(schema.exerciseLogs)
+        .set({ completedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000) })
+        .where(eq(schema.exerciseLogs.userId, userId));
+      await logCeilingSession(7.5);
+
+      const target = await getProgressionTargetForExercise(db, userId, exerciseId, prescription);
+      expect(target).toMatchObject({ reason: "INCREASE_LOAD", targetLoadKg: 10, loadInstruction: null });
+    });
+  });
 });

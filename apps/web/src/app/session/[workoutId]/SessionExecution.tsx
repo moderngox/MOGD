@@ -26,6 +26,7 @@ export interface SessionExerciseView {
     targetRepMax: number;
     reason: string;
     message: string;
+    loadInstruction: string | null;
   };
 }
 
@@ -52,6 +53,7 @@ function ExerciseCard({
   const [logged, setLogged] = useState<LoggedSet[]>([]);
   const [loadInput, setLoadInput] = useState("");
   const [repsInput, setRepsInput] = useState("");
+  const [rirInput, setRirInput] = useState("");
   const [painFlag, setPainFlag] = useState(false);
   const [techniqueConcern, setTechniqueConcern] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -68,6 +70,11 @@ function ExerciseCard({
       return;
     }
     const loadKg = loadInput ? Number(loadInput) : undefined;
+    const rir = rirInput === "" ? undefined : Number(rirInput);
+    if (rir !== undefined && (!Number.isInteger(rir) || rir < 0 || rir > 10)) {
+      setError("RIR must be a whole number from 0 to 10.");
+      return;
+    }
 
     setSaving(true);
     try {
@@ -77,11 +84,13 @@ function ExerciseCard({
         setNumber: nextSetNumber,
         loadKg,
         reps,
+        rir,
         painFlag: painFlag || undefined,
         techniqueValid: techniqueConcern ? false : undefined,
       });
       setLogged((prev) => [...prev, { setNumber: nextSetNumber, loadKg, reps }]);
       setRepsInput("");
+      setRirInput("");
       setPainFlag(false);
       setTechniqueConcern(false);
     } catch {
@@ -125,6 +134,9 @@ function ExerciseCard({
             : `${exercise.progressionTarget.targetRepMin}-${exercise.progressionTarget.targetRepMax} reps`}
         </span>
       </div>
+      {exercise.progressionTarget.loadInstruction && (
+        <p className="text-sm font-medium text-zinc-100">{exercise.progressionTarget.loadInstruction}</p>
+      )}
       <p className="text-xs text-zinc-500">{exercise.progressionTarget.message}</p>
 
       {logged.length > 0 && (
@@ -153,6 +165,13 @@ function ExerciseCard({
               value={repsInput}
               onChange={(e) => setRepsInput(e.target.value)}
               className="w-20"
+            />
+            <Input
+              type="number"
+              placeholder="RIR"
+              value={rirInput}
+              onChange={(e) => setRirInput(e.target.value)}
+              className="w-16"
             />
             <Button onClick={logSet} disabled={saving}>
               Log set {nextSetNumber}/{exercise.sets}

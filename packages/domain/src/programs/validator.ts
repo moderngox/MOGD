@@ -3,6 +3,7 @@ import type { Equipment, ExperienceLevel } from "../assessment/options";
 import { resolveActiveExercise } from "../exercises/exerciseCatalog";
 import { listProgrammingProfiles, resolveApplicableProfile } from "../exercises/programmingProfiles";
 import { MINUTES_PER_SET } from "../training/sessionAllocation";
+import { FINISHER_FATIGUE_CEILING, MAX_MAIN_SLOTS_PER_SESSION } from "../training/sessionRoleAssignment";
 import type { SessionLabel } from "../training/splitTemplates";
 import type { AllocatedExercise } from "../training/sessionAllocation";
 
@@ -56,6 +57,11 @@ export async function validateProgram(db: Database, plan: ProgramPlan): Promise<
       continue;
     }
 
+    const mainCount = workout.exercises.filter((e) => e.sessionRole === "main").length;
+    if (mainCount > MAX_MAIN_SLOTS_PER_SESSION) {
+      reasons.push(`Day ${workout.dayIndex} has ${mainCount} main exercises, over the limit of ${MAX_MAIN_SLOTS_PER_SESSION}.`);
+    }
+
     const estimatedMinutes = workout.exercises.reduce((sum, e) => sum + e.sets * MINUTES_PER_SET, 0);
     const max = plan.sessionDurationMinutes * (1 + DURATION_OVERSHOOT_TOLERANCE);
     const min = plan.sessionDurationMinutes * DURATION_UNDERSHOOT_FLOOR;
@@ -96,6 +102,17 @@ export async function validateProgram(db: Database, plan: ProgramPlan): Promise<
       // higher rep range), so those two aren't independently re-derivable
       // here without re-running role-modifier logic the validator
       // shouldn't need to know about.
+      // Assigned role must be one the exercise actually allows (accessory-only
+      // when unconfigured), and a finisher must be within the fatigue ceiling.
+      const configuredRoles = resolved.allowedSessionRoles as string[];
+      const allowedRoles = configuredRoles.length === 0 ? ["accessory"] : configuredRoles;
+      if (!allowedRoles.includes(exercise.sessionRole)) {
+        reasons.push(`"${exercise.canonicalId}" was assigned role "${exercise.sessionRole}", which it is not eligible for.`);
+      }
+      if (exercise.sessionRole === "finisher" && (resolved.fatigueScore ?? 0) > FINISHER_FATIGUE_CEILING) {
+        reasons.push(`"${exercise.canonicalId}" is too fatiguing to be a finisher.`);
+      }
+
       const profiles = await listProgrammingProfiles(db, resolved.id);
       const profile = resolveApplicableProfile(profiles, plan.experienceLevel);
       if (!profile) {

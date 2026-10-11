@@ -85,6 +85,16 @@ export async function getRecentSessionPerformance(
     }));
 }
 
+/** Every distinct load (kg) the athlete has ever logged for this exercise —
+ * the evidence the progression engine uses to know what increments exist. */
+export async function getObservedLoadsKg(db: Database, userId: string, exerciseId: string): Promise<number[]> {
+  const rows = await db
+    .selectDistinct({ loadKg: schema.exerciseLogs.loadKg })
+    .from(schema.exerciseLogs)
+    .where(and(eq(schema.exerciseLogs.userId, userId), eq(schema.exerciseLogs.exerciseId, exerciseId)));
+  return rows.map((r) => r.loadKg).filter((l): l is number => l !== null);
+}
+
 /**
  * Combines the recent-session lookup with the deterministic progression
  * rule for one workout exercise slot — the single function apps/web's
@@ -99,8 +109,8 @@ export async function getProgressionTargetForExercise(
   exerciseId: string,
   prescription: { sets: number; repMin: number; repMax: number; rirMin: number; rirMax: number },
 ): Promise<ProgressionTarget> {
-  const [exercise] = await db.select().from(schema.exercises).where(eq(schema.exercises.id, exerciseId));
   const recentSets = await getRecentSessionPerformance(db, userId, exerciseId);
+  const observedLoadsKg = await getObservedLoadsKg(db, userId, exerciseId);
 
   return computeProgressionTarget({
     prescribedSets: prescription.sets,
@@ -115,6 +125,6 @@ export async function getProgressionTargetForExercise(
     repMax: prescription.repMax,
     rirMin: prescription.rirMin,
     rirMax: prescription.rirMax,
-    movementPattern: exercise?.movementPattern ?? "",
+    observedLoadsKg,
   });
 }

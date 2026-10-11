@@ -68,6 +68,7 @@ export default async function SessionPage({
         targetRepMax: target.targetRepMax,
         reason: target.reason,
         message: target.message,
+        loadInstruction: target.loadInstruction,
       },
     });
   }

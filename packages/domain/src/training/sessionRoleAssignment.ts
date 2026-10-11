@@ -42,11 +42,11 @@ export const SESSION_ROLE_MODIFIERS: Record<SessionRole, RoleModifier> = {
 /** At most this many exercises hold "main" in one session — flat per docs/MOGD_06 §3's
  * singular framing and its Bench Press example (a second compound falls back to accessory
  * once main is taken), not split-type-aware. */
-const MAX_MAIN_SLOTS_PER_SESSION = 1;
+export const MAX_MAIN_SLOTS_PER_SESSION = 1;
 
 /** On the existing 0-10 fatigueScore scale — docs/MOGD_06 §10's "avoid placing
  * high-systemic-fatigue movements as finishers merely because the role exists." */
-const FINISHER_FATIGUE_CEILING = 6;
+export const FINISHER_FATIGUE_CEILING = 6;
 
 export interface RoleAssignment {
   role: SessionRole;
@@ -68,54 +68,82 @@ export interface RoleAssignment {
  * squat variant is *selected* before accessories) is separate, larger,
  * un-scoped work.
  */
+export class UnassignableRoleError extends Error {
+  constructor(canonicalId: string) {
+    super(`"${canonicalId}" has no legal session role for this position (eligibility, main-slot and fatigue constraints)`);
+    this.name = "UnassignableRoleError";
+  }
+}
+
+export interface RoleAssignmentState {
+  mainSlotsFilled: number;
+}
+
+/** Roles an exercise may take right now: its configured eligibility (accessory-only
+ * when unconfigured), minus "main" once the main slot is full and minus "finisher"
+ * above the fatigue ceiling — those two constraints hold on every branch, not just
+ * the default one. */
+export function legalRolesFor(exercise: CatalogExercise, state: RoleAssignmentState): SessionRole[] {
+  const configured = exercise.allowedSessionRoles as SessionRole[];
+  const allowed: SessionRole[] = configured.length === 0 ? ["accessory"] : configured;
+  return allowed.filter(
+    (role) =>
+      !(role === "main" && state.mainSlotsFilled >= MAX_MAIN_SLOTS_PER_SESSION) &&
+      !(role === "finisher" && (exercise.fatigueScore ?? 0) > FINISHER_FATIGUE_CEILING),
+  );
+}
+
+/**
+ * Assigns one exercise's role and advances `state` (main-slot count). Returns
+ * null when no role is legal — the caller must then not select the exercise
+ * rather than assign a role outside its eligibility or break a constraint.
+ */
+export function assignRole(
+  exercise: CatalogExercise,
+  state: RoleAssignmentState,
+  isLast: boolean,
+): RoleAssignment | null {
+  const unconfigured = (exercise.allowedSessionRoles as SessionRole[]).length === 0;
+  const legal = legalRolesFor(exercise, state);
+  const preferred = exercise.preferredSessionRole as SessionRole | null;
+
+  const take = (role: SessionRole, roleReason: RoleReason): RoleAssignment => {
+    if (role === "main") state.mainSlotsFilled += 1;
+    return { role, roleReason };
+  };
+
+  if (legal.length === 0) return null;
+
+  if (preferred && legal.includes(preferred)) return take(preferred, "PREFERRED_ROLE");
+
+  if (legal.length === 1) {
+    const only = legal[0]!;
+    if (unconfigured) return take(only, "NO_CONFIG_DEFAULT_ACCESSORY");
+    // Narrowed to accessory by a constraint (e.g. main slot full) is the ordinary fallback.
+    return take(only, only === "accessory" ? "DEFAULT_ACCESSORY_FALLBACK" : "ONLY_ELIGIBLE_ROLE");
+  }
+
+  if (legal.includes("main")) return take("main", "STRONGEST_MAIN_CANDIDATE");
+
+  if (isLast && legal.includes("finisher")) return take("finisher", "TAIL_POSITION_FINISHER");
+
+  if (legal.includes("accessory")) return take("accessory", "DEFAULT_ACCESSORY_FALLBACK");
+
+  // Deterministic only because allowedSessionRoles is persisted in canonical
+  // SESSION_ROLE_OPTIONS order (enforced at the admin-form layer).
+  return take(legal[0]!, "ONLY_ELIGIBLE_ROLE");
+}
+
 export function assignSessionRoles(
   selected: { exercise: CatalogExercise; score: number }[],
 ): RoleAssignment[] {
-  let mainSlotsFilled = 0;
+  const state: RoleAssignmentState = { mainSlotsFilled: 0 };
   const lastIndex = selected.length - 1;
 
   return selected.map(({ exercise }, index) => {
-    const configured = exercise.allowedSessionRoles as SessionRole[];
-    const unconfigured = configured.length === 0;
-    const allowedRoles: SessionRole[] = unconfigured ? ["accessory"] : configured;
-    const preferred = exercise.preferredSessionRole as SessionRole | null;
-
-    if (preferred && allowedRoles.includes(preferred)) {
-      const mainSlotOpen = mainSlotsFilled < MAX_MAIN_SLOTS_PER_SESSION;
-      if (preferred !== "main" || mainSlotOpen) {
-        if (preferred === "main") mainSlotsFilled += 1;
-        return { role: preferred, roleReason: "PREFERRED_ROLE" };
-      }
-    }
-
-    if (allowedRoles.length === 1) {
-      return {
-        role: allowedRoles[0]!,
-        roleReason: unconfigured ? "NO_CONFIG_DEFAULT_ACCESSORY" : "ONLY_ELIGIBLE_ROLE",
-      };
-    }
-
-    if (allowedRoles.includes("main") && mainSlotsFilled < MAX_MAIN_SLOTS_PER_SESSION) {
-      mainSlotsFilled += 1;
-      return { role: "main", roleReason: "STRONGEST_MAIN_CANDIDATE" };
-    }
-
-    if (
-      index === lastIndex &&
-      allowedRoles.includes("finisher") &&
-      (exercise.fatigueScore ?? 0) <= FINISHER_FATIGUE_CEILING
-    ) {
-      return { role: "finisher", roleReason: "TAIL_POSITION_FINISHER" };
-    }
-
-    if (allowedRoles.includes("accessory")) {
-      return { role: "accessory", roleReason: "DEFAULT_ACCESSORY_FALLBACK" };
-    }
-
-    // Rare safety net (e.g. allowedRoles = ["superset","finisher"] mid-session).
-    // Deterministic only because allowedSessionRoles is persisted in canonical
-    // SESSION_ROLE_OPTIONS order (enforced at the admin-form layer).
-    return { role: allowedRoles[0]!, roleReason: "ONLY_ELIGIBLE_ROLE" };
+    const assignment = assignRole(exercise, state, index === lastIndex);
+    if (!assignment) throw new UnassignableRoleError(exercise.canonicalId);
+    return assignment;
   });
 }
 

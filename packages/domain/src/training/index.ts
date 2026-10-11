@@ -15,6 +15,7 @@ export {
 export {
   computeProgressionTarget,
   PROGRESSION_REASON_OPTIONS,
+  resolveKnownNextLoad,
   type ProgressionInput,
   type ProgressionTarget,
   type ProgressionReason,

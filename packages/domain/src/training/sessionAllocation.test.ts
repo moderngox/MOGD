@@ -238,6 +238,37 @@ describe("allocateSession", () => {
     expect(result.map((e) => e.sessionRole)).toEqual(["main", "accessory", "finisher"]);
   });
 
+  it("skips a second main-only exercise and fills the slot with the next assignable candidate", () => {
+    const mainOnlyA = mockExercise({
+      canonicalId: "a_main_only",
+      allowedSessionRoles: ["main"],
+      primaryMuscles: ["upper_chest"] as CanonicalMuscleGroup[],
+      hypertrophyScore: 10,
+    });
+    const mainOnlyB = mockExercise({
+      canonicalId: "b_main_only",
+      allowedSessionRoles: ["main"],
+      primaryMuscles: ["upper_chest"] as CanonicalMuscleGroup[],
+      hypertrophyScore: 9,
+    });
+    const flexible = mockExercise({
+      canonicalId: "c_flexible",
+      primaryMuscles: ["upper_chest"] as CanonicalMuscleGroup[],
+      hypertrophyScore: 1,
+    });
+
+    const result = allocateSession({
+      sessionLabel: "push",
+      candidates: [mainOnlyA, mainOnlyB, flexible],
+      weeklyVolumeTargets: { upper_chest: 14 } as Record<CanonicalMuscleGroup, number>,
+      trainingBias: { hypertrophy: 0.75, strength: 0.25 },
+      sessionDurationMinutes: 30,
+    });
+
+    expect(result.map((e) => e.canonicalId)).toEqual(["a_main_only", "c_flexible"]);
+    expect(result.filter((e) => e.sessionRole === "main")).toHaveLength(1);
+  });
+
   it("is deterministic: identical inputs produce identical output", () => {
     const candidates = Array.from({ length: 5 }, (_, i) =>
       mockExercise({ canonicalId: `ex_${i}`, primaryMuscles: ["upper_chest"] as CanonicalMuscleGroup[] }),

@@ -4,7 +4,7 @@ import type { SessionRole } from "../exercises/options";
 import type { SessionLabel } from "./splitTemplates";
 import { SESSION_MUSCLE_MAP } from "./splitTemplates";
 import type { EligibleExercise } from "./candidatePool";
-import { assignSessionRoles, applyRoleModifier } from "./sessionRoleAssignment";
+import { assignRole, assignSessionRoles, applyRoleModifier } from "./sessionRoleAssignment";
 import type { RoleReason } from "./sessionRoleAssignment";
 
 export interface AllocatedExercise {
@@ -152,11 +152,19 @@ export function allocateSession(input: {
     }))
     .sort((a, b) => b.score - a.score || a.exercise.canonicalId.localeCompare(b.exercise.canonicalId));
 
-  const exerciseCount = Math.min(
-    exerciseCountForDuration(input.sessionDurationMinutes),
-    scored.length,
-  );
-  const selected = scored.slice(0, exerciseCount);
+  const targetCount = exerciseCountForDuration(input.sessionDurationMinutes);
+
+  // Walk candidates in score order, skipping any with no legal role at this
+  // point (e.g. a main-only exercise once the main slot is taken, or a
+  // finisher-only exercise above the fatigue ceiling). isLast=false is the
+  // conservative probe: the tail-finisher option only ever adds a choice and
+  // never changes main-slot state, so it can't make a probed exercise unassignable.
+  const selected: typeof scored = [];
+  const probeState = { mainSlotsFilled: 0 };
+  for (const candidate of scored) {
+    if (selected.length >= targetCount) break;
+    if (assignRole(candidate.exercise, probeState, false)) selected.push(candidate);
+  }
 
   const minSetsFloor = selected.reduce((sum, s) => sum + s.exercise.programmingProfile.setsMin, 0);
   const totalSetBudget = Math.max(minSetsFloor, Math.round(input.sessionDurationMinutes / MINUTES_PER_SET));
