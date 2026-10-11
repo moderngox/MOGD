@@ -56,6 +56,35 @@ export const MINUTES_PER_SET = 4;
 
 const LARGE_REST_PATTERNS = new Set(["squat", "hinge", "carry"]);
 
+/**
+ * The trainee-level baseline an exercise starts from before its role modifier:
+ * reps and RIR straight from the resolved profile, rest at the profile's top
+ * for big compound patterns and its bottom otherwise. Pure and shared — the
+ * generator uses it, and the validator re-derives the expected final
+ * prescription from it instead of trusting the generator's output.
+ */
+export function baselinePrescription(
+  exercise: { movementPattern: string },
+  profile: {
+    repsMin: number;
+    repsMax: number;
+    rirMin: number;
+    rirMax: number;
+    restSecondsMin: number;
+    restSecondsMax: number;
+  },
+  sets: number,
+) {
+  return {
+    sets,
+    repMin: profile.repsMin,
+    repMax: profile.repsMax,
+    rirMin: profile.rirMin,
+    rirMax: profile.rirMax,
+    restSeconds: LARGE_REST_PATTERNS.has(exercise.movementPattern) ? profile.restSecondsMax : profile.restSecondsMin,
+  };
+}
+
 /** Primary/secondary muscle-role scoring weights (docs/02_EXERCISE_RELATIONSHIPS_IMPLEMENTATION.md
  * §4's "recommendation configuration", not per-exercise data). Values are the
  * existing tuned constants, unchanged — this is a naming extraction only. */
@@ -196,18 +225,7 @@ export function allocateSession(input: {
   return ordered.map((s, index) => {
     const profile = s.exercise.programmingProfile;
     const sets = plannedSets[index]!;
-    const restSeconds = LARGE_REST_PATTERNS.has(s.exercise.movementPattern)
-      ? profile.restSecondsMax
-      : profile.restSecondsMin;
-
-    const baseline = {
-      sets,
-      repMin: profile.repsMin,
-      repMax: profile.repsMax,
-      rirMin: profile.rirMin,
-      rirMax: profile.rirMax,
-      restSeconds,
-    };
+    const baseline = baselinePrescription(s.exercise, profile, sets);
     const { role, roleReason } = roles[index]!;
     const contextual = applyRoleModifier(baseline, role, { min: profile.setsMin, max: profile.setsMax }, input.roleRules);
 

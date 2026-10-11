@@ -2,7 +2,8 @@ import type { Database } from "@mogd/db";
 import type { Equipment, ExperienceLevel } from "../assessment/options";
 import { resolveActiveExercise } from "../exercises/exerciseCatalog";
 import { listProgrammingProfiles, resolveApplicableProfile } from "../exercises/programmingProfiles";
-import { MINUTES_PER_SET } from "../training/sessionAllocation";
+import { baselinePrescription, MINUTES_PER_SET } from "../training/sessionAllocation";
+import { applyRoleModifier } from "../training/sessionRoleAssignment";
 import type { RoleRules } from "../training/roleRules";
 import { getRoleRulesRevision } from "../training/roleRulesStore";
 import {
@@ -39,6 +40,58 @@ export interface ValidationResult {
 // near-empty session slipping through.
 const DURATION_OVERSHOOT_TOLERANCE = 0.15;
 const DURATION_UNDERSHOOT_FLOOR = 0.5;
+
+/**
+ * Re-derives an exercise's expected final prescription — the trainee-level
+ * baseline from the live profile, then the assigned role's modifier under the
+ * named rules revision — and rejects any mismatch, plus structural nonsense
+ * (non-integers, inverted or out-of-range ranges) that would be wrong whatever
+ * the derivation. Sets are range-checked elsewhere: their final value also
+ * depends on the session's set budget and a superset's shared count, which
+ * aren't re-derivable per exercise.
+ */
+function validatePrescription(
+  exercise: AllocatedExercise,
+  resolved: { movementPattern: string },
+  profile: NonNullable<ReturnType<typeof resolveApplicableProfile>>,
+  rules: RoleRules,
+  reasons: string[],
+): void {
+  const name = `"${exercise.canonicalId}"`;
+
+  const fields = ["sets", "repMin", "repMax", "rirMin", "rirMax", "restSeconds"] as const;
+  const nonInteger = fields.filter((f) => !Number.isInteger(exercise[f]));
+  if (nonInteger.length > 0) {
+    reasons.push(`${name} has non-integer ${nonInteger.join(", ")}.`);
+    return;
+  }
+
+  if (exercise.repMin < 1 || exercise.repMax > 100 || exercise.repMin > exercise.repMax) {
+    reasons.push(`${name} has an invalid rep range ${exercise.repMin}-${exercise.repMax}.`);
+  }
+  if (exercise.rirMin < 0 || exercise.rirMax > 10 || exercise.rirMin > exercise.rirMax) {
+    reasons.push(`${name} has an invalid RIR range ${exercise.rirMin}-${exercise.rirMax}.`);
+  }
+  if (exercise.restSeconds < rules.restSecondsFloor || exercise.restSeconds > 600) {
+    reasons.push(
+      `${name} has ${exercise.restSeconds}s rest, outside the ${rules.restSecondsFloor}-600s allowed.`,
+    );
+  }
+
+  const expected = applyRoleModifier(
+    baselinePrescription(resolved, profile, exercise.sets),
+    exercise.sessionRole,
+    { min: profile.setsMin, max: profile.setsMax },
+    rules,
+  );
+  for (const field of ["repMin", "repMax", "rirMin", "rirMax", "restSeconds"] as const) {
+    if (exercise[field] !== expected[field]) {
+      reasons.push(
+        `${name} has ${field} ${exercise[field]} but ${expected[field]} is expected for a ${exercise.sessionRole} under this profile and rules.`,
+      );
+    }
+  }
+}
 
 /**
  * A superset is exactly two adjacent exercises, both role "superset", sharing a
@@ -159,16 +212,8 @@ export async function validateProgram(db: Database, plan: ProgramPlan): Promise<
         reasons.push(`"${exercise.canonicalId}" requires equipment the user doesn't have.`);
       }
 
-      // Re-resolve the applicable trainee-level profile independently
-      // rather than trusting the generator's own resolution (same
-      // "re-derive every invariant" discipline as the rest of this
-      // function) — mogd_programming_engine_specs 05 acceptance criteria.
-      // Only sets is re-checked against the profile directly: session-role
-      // modifiers (sessionRoleAssignment.ts) deliberately shift rep/RIR
-      // targets outside the baseline profile envelope (e.g. finisher's
-      // higher rep range), so those two aren't independently re-derivable
-      // here without re-running role-modifier logic the validator
-      // shouldn't need to know about.
+      // The applicable trainee-level profile is re-resolved independently (not trusted
+      // from the generator), then the final prescription is re-derived from it.
       // Assigned role must be one the exercise actually allows (accessory-only
       // when unconfigured), and a finisher must be within the fatigue ceiling.
       const configuredRoles = resolved.allowedSessionRoles as string[];
@@ -190,7 +235,10 @@ export async function validateProgram(db: Database, plan: ProgramPlan): Promise<
         );
       }
 
-      if (profile) checked.set(exercise.orderIndex, { ...resolved, programmingProfile: profile });
+      if (profile) {
+        validatePrescription(exercise, resolved, profile, rules, reasons);
+        checked.set(exercise.orderIndex, { ...resolved, programmingProfile: profile });
+      }
     }
 
     validateSupersets(workout, checked, rules, reasons);

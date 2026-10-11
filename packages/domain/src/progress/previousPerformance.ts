@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, isNotNull, isNull, ne, or } from "drizzle-orm";
 import { schema, type Database } from "@mogd/db";
 import { computeProgressionTarget, type ProgressionTarget } from "../training/progression";
+import { InvalidRecommendationError, validateProgressionTarget } from "../training/progressionValidation";
 
 /**
  * History = the sets of the athlete's most recent *other* workout occurrence
@@ -195,7 +196,7 @@ export async function getProgressionTargetForExercise(
   const hasOtherContext =
     recent.sets.length === 0 && (await hasHistoryInOtherContext(db, userId, exerciseId, context.locationId));
 
-  return computeProgressionTarget({
+  const target = computeProgressionTarget({
     recentSets: recent.sets.map((s) => ({
       reps: s.reps,
       loadKg: s.loadKg,
@@ -208,4 +209,9 @@ export async function getProgressionTargetForExercise(
     observedLoadsKg,
     hasHistoryInOtherContext: hasOtherContext,
   });
+
+  // A second, independent opinion before anything is shown or snapshotted.
+  const failures = validateProgressionTarget(target, { currentPrescription: prescription, observedLoadsKg });
+  if (failures.length > 0) throw new InvalidRecommendationError(failures);
+  return target;
 }

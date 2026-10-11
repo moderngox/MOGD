@@ -56,9 +56,11 @@ describe("validateProgram", () => {
               exerciseId,
               canonicalId,
               orderIndex: 0,
+              // Derived from the seeded default profile (reps 6-10, RIR 1-3, rest 75-120) and
+              // the main role (rest x1.2): exactly what the generator would produce.
               sets: 3,
-              repMin: 8,
-              repMax: 12,
+              repMin: 6,
+              repMax: 10,
               rirMin: 1,
               rirMax: 3,
               restSeconds: 90,
@@ -163,6 +165,71 @@ describe("validateProgram", () => {
     expect(result.reasons.some((r) => r.includes("no enabled programming profile"))).toBe(true);
   });
 
+  describe("final prescription", () => {
+    const tamper = (patch: (e: ProgramPlan["workouts"][0]["exercises"][0]) => void) => {
+      const plan = basePlan();
+      patch(plan.workouts[0]!.exercises[0]!);
+      return plan;
+    };
+    const rejectsWith = async (plan: ProgramPlan, fragment: string) => {
+      const result = await validateProgram(db, plan);
+      expect(result.valid).toBe(false);
+      expect(result.reasons.some((r) => r.includes(fragment))).toBe(true);
+    };
+
+    it("rejects a repMin that isn't what the profile and role produce", async () => {
+      await rejectsWith(tamper((e) => (e.repMin = 7)), "repMin 7 but 6 is expected");
+    });
+
+    it("rejects a repMax that isn't what the profile and role produce", async () => {
+      await rejectsWith(tamper((e) => (e.repMax = 12)), "repMax 12 but 10 is expected");
+    });
+
+    it("rejects an rirMin that isn't what the profile and role produce", async () => {
+      await rejectsWith(tamper((e) => (e.rirMin = 0)), "rirMin 0 but 1 is expected");
+    });
+
+    it("rejects an rirMax that isn't what the profile and role produce", async () => {
+      await rejectsWith(tamper((e) => (e.rirMax = 4)), "rirMax 4 but 3 is expected");
+    });
+
+    it("rejects a rest time that isn't what the profile and role produce", async () => {
+      await rejectsWith(tamper((e) => (e.restSeconds = 200)), "restSeconds 200 but 90 is expected");
+    });
+
+    it("rejects an inverted or out-of-range rep range, whatever the derivation", async () => {
+      await rejectsWith(tamper((e) => ((e.repMin = 12), (e.repMax = 8))), "invalid rep range 12-8");
+      await rejectsWith(tamper((e) => (e.repMax = 150)), "invalid rep range");
+    });
+
+    it("rejects an inverted or out-of-range RIR range", async () => {
+      await rejectsWith(tamper((e) => ((e.rirMin = 3), (e.rirMax = 1))), "invalid RIR range 3-1");
+      await rejectsWith(tamper((e) => (e.rirMax = 11)), "invalid RIR range");
+    });
+
+    it("rejects rest outside the allowed window", async () => {
+      await rejectsWith(tamper((e) => (e.restSeconds = 10)), "outside the 30-600s allowed");
+      await rejectsWith(tamper((e) => (e.restSeconds = 900)), "outside the 30-600s allowed");
+    });
+
+    it("rejects non-integer values", async () => {
+      await rejectsWith(tamper((e) => (e.repMin = 6.5)), "non-integer repMin");
+    });
+
+    it("validates against the named rules revision: values built under custom rules need that revision", async () => {
+      const slower = await saveRoleRules(db, null, {
+        ...DEFAULT_ROLE_RULES,
+        roles: { ...DEFAULT_ROLE_RULES.roles, main: { restMultiplier: 2 } },
+      });
+      // Main rest under the custom rules: 75 x 2 = 150.
+      const builtUnderCustom = tamper((e) => (e.restSeconds = 150));
+
+      expect((await validateProgram(db, { ...builtUnderCustom, roleRulesRevisionId: slower.id })).valid).toBe(true);
+      await rejectsWith({ ...builtUnderCustom, roleRulesRevisionId: null }, "restSeconds 150 but 90 is expected");
+      await rejectsWith({ ...basePlan(), roleRulesRevisionId: slower.id }, "restSeconds 90 but 150 is expected");
+    });
+  });
+
   describe("superset groups", () => {
     let aId: string;
     let bId: string;
@@ -191,11 +258,11 @@ describe("validateProgram", () => {
         canonicalId,
         orderIndex,
         sets: 3,
-        repMin: 12,
-        repMax: 15,
+        repMin: 6,
+        repMax: 10,
         rirMin: 1,
         rirMax: 3,
-        restSeconds: 45,
+        restSeconds: 55, // isolation baseline 75 x superset 0.7, rounded to 5
         sessionRole: "superset" as const,
         roleReason: "SUPERSET_PAIR" as const,
         supersetGroupIndex: 0,

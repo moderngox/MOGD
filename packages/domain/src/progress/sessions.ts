@@ -195,8 +195,9 @@ async function syncPerformanceCompleted(db: Database, performance: ExercisePerfo
 /**
  * Logs one set of the in-progress occurrence. Upsert on (performance, setNumber):
  * the first call inserts, a retry of the same payload is a no-op, and a
- * changed payload for an existing set number corrects it — so a double-tap or
- * a retried request can never duplicate a set. Set numbers stay contiguous.
+ * changed payload for an existing set number corrects it — so a double-tap, a
+ * retried request or a simultaneous duplicate can never duplicate a set or fail.
+ * Set numbers stay contiguous.
  */
 export async function logSet(db: Database, userId: string, rawInput: LogSetInput): Promise<LoggedSet> {
   const input = logSetInput.parse(rawInput);
@@ -215,20 +216,25 @@ export async function logSet(db: Database, userId: string, rawInput: LogSetInput
     painFlag: input.painFlag ?? null,
     techniqueValid: input.techniqueValid ?? null,
   };
-  const existing = existingSets.find((s) => s.setNumber === input.setNumber);
-
-  const [logged] = existing
-    ? await db.update(schema.exerciseLogs).set(values).where(eq(schema.exerciseLogs.id, existing.id)).returning()
-    : await db
-        .insert(schema.exerciseLogs)
-        .values({
-          userId,
-          exerciseId: input.exerciseId,
-          workoutExercisePerformanceId: performance.id,
-          setNumber: input.setNumber,
-          ...values,
-        })
-        .returning();
+  // One conflict-aware statement, not read-then-insert: two simultaneous first
+  // submissions of the same set would otherwise both choose "insert" and one
+  // would fail on the unique index. Now one inserts and the other updates to
+  // the same values, so both succeed. Disagreeing concurrent payloads for one
+  // set are last-write-wins (there is still exactly one row).
+  const [logged] = await db
+    .insert(schema.exerciseLogs)
+    .values({
+      userId,
+      exerciseId: input.exerciseId,
+      workoutExercisePerformanceId: performance.id,
+      setNumber: input.setNumber,
+      ...values,
+    })
+    .onConflictDoUpdate({
+      target: [schema.exerciseLogs.workoutExercisePerformanceId, schema.exerciseLogs.setNumber],
+      set: values,
+    })
+    .returning();
 
   await syncPerformanceCompleted(db, performance);
   return logged!;

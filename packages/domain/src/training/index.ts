@@ -22,6 +22,11 @@ export {
   type ProgressionReason,
   type LoggedSetForProgression,
 } from "./progression";
+export {
+  validateProgressionTarget,
+  InvalidRecommendationError,
+  type RecommendationContext,
+} from "./progressionValidation";
 export { roleRulesSchema, DEFAULT_ROLE_RULES, ROLE_RULE_BOUNDS, type RoleRules } from "./roleRules";
 export {
   getCurrentRoleRules,

@@ -258,4 +258,52 @@ describe("workout sessions", () => {
       expect(await db.select().from(schema.workoutSessions)).toHaveLength(0);
     });
   });
+
+  describe("concurrent logging", () => {
+    it("converges when the same first set is submitted many times at once", async () => {
+      const results = await Promise.allSettled(Array.from({ length: 8 }, () => logSet(db, userId, set(1))));
+
+      expect(results.filter((r) => r.status === "rejected")).toHaveLength(0);
+      expect(await allLogs()).toHaveLength(1);
+      expect(await db.select().from(schema.workoutSessions)).toHaveLength(1);
+      expect(await db.select().from(schema.workoutExercisePerformances)).toHaveLength(1);
+    });
+
+    it("ends with exactly one row when concurrent submissions disagree (last write wins)", async () => {
+      const results = await Promise.allSettled(
+        [10, 11, 12, 13].map((reps) => logSet(db, userId, set(1, { reps }))),
+      );
+
+      expect(results.filter((r) => r.status === "rejected")).toHaveLength(0);
+      const logs = await allLogs();
+      expect(logs).toHaveLength(1);
+      expect([10, 11, 12, 13]).toContain(logs[0]!.reps);
+    });
+
+    it("starts one occurrence when two exercises of a new workout are logged at once", async () => {
+      const other = await createExercise(db, {
+        canonicalId: "pull_up",
+        name: "Pull-up",
+        movementPattern: "pull",
+        difficulty: "intermediate",
+        primaryMuscles: ["lats"],
+        secondaryMuscles: [],
+        equipment: ["pull_up_bar"],
+        contraindicationTags: [],
+        isActive: true,
+        allowedSessionRoles: [],
+      });
+      const twoExerciseWorkout = await seedWorkout(db, userId, [exerciseId, other!.id]);
+
+      const results = await Promise.allSettled([
+        logSet(db, userId, set(1, { workoutId: twoExerciseWorkout })),
+        logSet(db, userId, set(1, { workoutId: twoExerciseWorkout, exerciseId: other!.id })),
+      ]);
+
+      expect(results.filter((r) => r.status === "rejected")).toHaveLength(0);
+      const sessions = await db.select().from(schema.workoutSessions).where(eq(schema.workoutSessions.workoutId, twoExerciseWorkout));
+      expect(sessions).toHaveLength(1);
+      expect(await db.select().from(schema.workoutExercisePerformances).where(eq(schema.workoutExercisePerformances.workoutSessionId, sessions[0]!.id))).toHaveLength(2);
+    });
+  });
 });

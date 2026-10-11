@@ -92,10 +92,10 @@ const CATALOG: CreateExerciseInput[] = [
   },
 ];
 
-async function seedUser(db: Database) {
+async function seedUser(db: Database, experienceLevel: "beginner" | "intermediate" | "advanced" = "intermediate") {
   const [user] = await db
     .insert(schema.users)
-    .values({ email: "program-test@example.com" })
+    .values({ email: `program-test-${experienceLevel}@example.com` })
     .returning({ id: schema.users.id });
   const userId = user!.id;
 
@@ -114,7 +114,7 @@ async function seedUser(db: Database) {
   });
   await db.insert(schema.trainingProfiles).values({
     userId,
-    experienceLevel: "intermediate",
+    experienceLevel,
     trainingConsistency: "consistent",
     currentActivityLevel: "moderately_active",
     sessionsPerWeek: 2,
@@ -266,6 +266,39 @@ describe("generateProgram", () => {
       rirMax: firstExercise!.rirMax,
     });
     expect(await db.select().from(schema.exerciseLogs)).toHaveLength(1);
+  });
+
+  it("produces a plan the independent validator accepts at every experience level", async () => {
+    // The shared catalog has few beginner-accessible exercises; add enough that a beginner's
+    // sessions aren't rejected by the (unrelated) duration floor.
+    const beginnerExtras: [string, CreateExerciseInput["movementPattern"], CreateExerciseInput["primaryMuscles"][number]][] = [
+      ["goblet_squat", "squat", "quadriceps"],
+      ["dumbbell_row", "pull", "upper_back"],
+      ["dumbbell_curl", "isolation", "biceps"],
+      ["dumbbell_calf_raise", "isolation", "calves"],
+    ];
+    for (const [canonicalId, movementPattern, muscle] of beginnerExtras) {
+      await createExercise(db, {
+        canonicalId,
+        name: canonicalId,
+        movementPattern,
+        difficulty: "beginner",
+        primaryMuscles: [muscle],
+        secondaryMuscles: [],
+        equipment: ["dumbbells"],
+        contraindicationTags: [],
+        isActive: true,
+        allowedSessionRoles: ALL_ROLES,
+      });
+    }
+
+    for (const level of ["beginner", "intermediate", "advanced"] as const) {
+      const userId = await seedUser(db, level);
+      await generateStrategyAndNutrition(db, userId);
+      const result = await generateProgram(db, userId);
+      expect(result.reasons).toEqual([]);
+      expect(result.success).toBe(true);
+    }
   });
 
   describe("role rules", () => {

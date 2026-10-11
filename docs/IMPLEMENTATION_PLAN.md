@@ -74,3 +74,19 @@ Also defer full food databases, barcode scanning, meal-photo recognition, social
 ## Validation practice
 
 Test deterministic nutrition, goal compilation, exercise filtering, program constraints, progression, adaptation and AI validation. Cover private-media/admin authorization and deletion. Perform an end-to-end assessment → plan → workout → check-in → adjustment check. Update relevant docs with significant logic changes.
+
+## Programming engine — accepted deviations and open decisions
+
+Recorded after the Oct 2026 audit and recheck, so each is a decision on the record rather than a silent omission. Closed since: actual-RIR capture, the workout-session occurrence record, equipment-aware history, role constraints on every branch, superset pairing, configurable role rules, independent validation of final prescriptions and recommendations, and convergent concurrent set logging.
+
+**Accepted deviation — individualized targets are computed when the workout starts, not at program generation.** The original spec's generator step applies history and persists an individualized prescription with the program. Here, generation persists the contextual (profile + role) prescription, and the load recommendation is computed when the athlete's first set starts an occurrence and snapshotted then. Reason: history can change between generating a program and performing the workout, so a recommendation fixed at generation goes stale. Reverting means moving that computation into `generateProgram` and accepting stale targets.
+
+**Open decision — structured injury/contraindication matching.** Candidate filtering still does not match a user's limitations to exercise contraindication tags (`candidatePool.ts`). It needs a reviewed structured taxonomy; `docs/AI_AND_SAFETY.md` says clinical categories must not be invented. Unblocked by a reviewed list of limitation and contraindication categories.
+
+**Open decision — what counts as a changed prescription.** Progression treats only a changed rep or RIR range as a context change. Role, rest and set-count changes do not recalibrate the load; widening it would make every role-rules edit recalibrate every athlete. Decide if that trade is wanted.
+
+**Open decision — exercises with no configured roles.** An empty `allowedSessionRoles` is treated as accessory-only (the admin form warns about it; the validator agrees). This differs from the literal rule that an assigned role must appear in the list. Options: migrate empty lists to an explicit `["accessory"]` and require at least one role, or keep the documented fallback.
+
+**Not recoverable — legacy rep bounds.** The profile migration dropped the old `defaultRepMin/Max` before the backfill ran, so existing exercises hold generic inherited defaults (marked `isInheritedDefault`) rather than their former values. Admin can edit each level; nothing can restore the originals.
+
+**Still deferred — edge cases that need a product rule first:** assisted-bodyweight load semantics, left/right side tracking for unilateral work, long-gap detraining, deload weeks, skipped/substituted exercises, manual override of a recommendation, and per-machine (rather than per-location) equipment identity.
