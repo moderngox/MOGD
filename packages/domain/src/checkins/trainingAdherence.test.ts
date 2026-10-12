@@ -34,7 +34,7 @@ describe("computeTrainingAdherence", () => {
       equipment: ["dumbbells"],
       contraindicationTags: [],
       isActive: true,
-      allowedSessionRoles: [],
+      allowedSessionRoles: ["accessory"],
     });
     exerciseId = exercise!.id;
 

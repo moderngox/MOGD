@@ -14,7 +14,6 @@ export const ROLE_REASON_OPTIONS = [
   "ONLY_ELIGIBLE_ROLE",
   "TAIL_POSITION_FINISHER",
   "DEFAULT_ACCESSORY_FALLBACK",
-  "NO_CONFIG_DEFAULT_ACCESSORY",
   // Both members of a superset pair; set only by training/supersetPairing.ts.
   "SUPERSET_PAIR",
 ] as const;
@@ -51,15 +50,14 @@ export interface RoleAssignmentState {
   mainSlotsFilled: number;
 }
 
-/** Roles an exercise may take right now: its configured eligibility (accessory-only
- * when unconfigured), minus "main" once the main slot is full and minus "finisher"
+/** Roles an exercise may take right now: exactly its allowedSessionRoles (never a role
+ * outside the list; an empty list yields none), minus "main" once the main slot is full and minus "finisher"
  * above the fatigue ceiling — those two constraints hold on every branch, not just
  * the default one. "superset" is never offered here: a superset is two exercises
  * done back to back, so it is only ever the outcome of the pairing pass
  * (training/supersetPairing.ts), which promotes accessories. */
 export function legalRolesFor(exercise: CatalogExercise, state: RoleAssignmentState, rules: RoleRules): SessionRole[] {
-  const configured = exercise.allowedSessionRoles as SessionRole[];
-  const allowed: SessionRole[] = configured.length === 0 ? ["accessory"] : configured;
+  const allowed = exercise.allowedSessionRoles as SessionRole[];
   return allowed.filter(
     (role) =>
       role !== "superset" &&
@@ -79,7 +77,6 @@ export function assignRole(
   isLast: boolean,
   rules: RoleRules,
 ): RoleAssignment | null {
-  const unconfigured = (exercise.allowedSessionRoles as SessionRole[]).length === 0;
   const legal = legalRolesFor(exercise, state, rules);
   const preferred = exercise.preferredSessionRole as SessionRole | null;
 
@@ -94,7 +91,6 @@ export function assignRole(
 
   if (legal.length === 1) {
     const only = legal[0]!;
-    if (unconfigured) return take(only, "NO_CONFIG_DEFAULT_ACCESSORY");
     // Narrowed to accessory by a constraint (e.g. main slot full) is the ordinary fallback.
     return take(only, only === "accessory" ? "DEFAULT_ACCESSORY_FALLBACK" : "ONLY_ELIGIBLE_ROLE");
   }

@@ -11,10 +11,9 @@ import { saveRoleRules } from "../training/roleRulesStore";
 import { SESSION_ROLE_OPTIONS } from "../exercises/options";
 import type { CreateExerciseInput } from "../exercises/schemas";
 
-// Permissive allowedSessionRoles on every fixture exercise so the new
-// eligibility-aware engine has real role data to assign against — an empty
-// array would make every exercise fall into the NO_CONFIG_DEFAULT_ACCESSORY
-// fallback and the "main"/"finisher" assertions below could never pass.
+// Permissive allowedSessionRoles on every fixture exercise so the engine has real role
+// data to assign against (an exercise must list at least one role), and the
+// "main"/"finisher" assertions below can pass.
 const ALL_ROLES = [...SESSION_ROLE_OPTIONS];
 
 const CATALOG: CreateExerciseInput[] = [
@@ -203,7 +202,7 @@ describe("generateProgram", () => {
       equipment: ["barbell"],
       contraindicationTags: [],
       isActive: true,
-      allowedSessionRoles: [],
+      allowedSessionRoles: ["accessory"],
     });
     await generateStrategyAndNutrition(db, userId);
     await generateProgram(db, userId);

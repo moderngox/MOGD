@@ -43,7 +43,9 @@ const exerciseFields = z.object({
   isActive: z.coerce.boolean().default(true),
   // Eligibility, not assignment (docs/MOGD_06-session-role-architecture.md
   // §3) — the engine assigns the actual role per generated session.
-  allowedSessionRoles: z.array(z.enum(SESSION_ROLE_OPTIONS)).default([]),
+  // Explicit eligibility: at least one role. An empty list is invalid state (it used to mean
+  // "not configured" and was silently treated as accessory-only); never coerced.
+  allowedSessionRoles: z.array(z.enum(SESSION_ROLE_OPTIONS)).min(1, "Select at least one allowed role"),
   preferredSessionRole: z.enum(SESSION_ROLE_OPTIONS).optional(),
 });
 
@@ -77,6 +79,13 @@ const SUPERSET_REFINE_OPTIONS: { message: string; path: (string | number)[] } = 
 };
 
 export const createExerciseInput = exerciseFields
+  // On create only, omitting the roles means accessory — an explicit stored default, not a runtime fallback.
+  .extend({
+    allowedSessionRoles: z
+      .array(z.enum(SESSION_ROLE_OPTIONS))
+      .min(1, "Select at least one allowed role")
+      .default(["accessory"]),
+  })
   .refine(preferredRoleMustBeAllowed, REFINE_OPTIONS)
   .refine(supersetNeedsAnotherRole, SUPERSET_REFINE_OPTIONS);
 export type CreateExerciseInput = z.infer<typeof createExerciseInput>;

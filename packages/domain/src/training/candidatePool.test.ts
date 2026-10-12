@@ -37,7 +37,7 @@ describe("getExerciseCandidates", () => {
       equipment: ["dumbbells"],
       contraindicationTags: [],
       isActive: true,
-      allowedSessionRoles: [],
+      allowedSessionRoles: ["accessory"],
     });
     await createExercise(db, {
       canonicalId: "barbell_back_squat",
@@ -49,7 +49,7 @@ describe("getExerciseCandidates", () => {
       equipment: ["barbell"],
       contraindicationTags: [],
       isActive: true,
-      allowedSessionRoles: [],
+      allowedSessionRoles: ["accessory"],
     });
     await createExercise(db, {
       canonicalId: "retired_move",
@@ -61,7 +61,7 @@ describe("getExerciseCandidates", () => {
       equipment: [],
       contraindicationTags: [],
       isActive: false,
-      allowedSessionRoles: [],
+      allowedSessionRoles: ["accessory"],
     });
   });
 
@@ -149,6 +149,22 @@ describe("getExerciseCandidates", () => {
     for (const level of ["beginner", "intermediate", "advanced"] as const) {
       await upsertProgrammingProfile(db, id, level, DISABLED_PROFILE_INPUT);
     }
+
+    const candidates = await getExerciseCandidates(db, {
+      sessionLabel: "push",
+      experienceLevel: "intermediate",
+      equipment: ["dumbbells"],
+    });
+    expect(candidates.some((c) => c.canonicalId === "incline_dumbbell_press")).toBe(false);
+  });
+
+  it("excludes an exercise that has no allowed session roles", async () => {
+    const rows = await db
+      .select({ id: schema.exercises.id })
+      .from(schema.exercises)
+      .where(eq(schema.exercises.canonicalId, "incline_dumbbell_press"));
+    // Legacy-style invalid state: bypass the write boundary the way old data could.
+    await db.update(schema.exercises).set({ allowedSessionRoles: [] }).where(eq(schema.exercises.id, rows[0]!.id));
 
     const candidates = await getExerciseCandidates(db, {
       sessionLabel: "push",

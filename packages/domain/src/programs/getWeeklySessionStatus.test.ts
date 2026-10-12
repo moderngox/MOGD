@@ -32,7 +32,7 @@ describe("getWeeklySessionStatus", () => {
       equipment: ["cables"],
       contraindicationTags: [],
       isActive: true,
-      allowedSessionRoles: [],
+      allowedSessionRoles: ["accessory"],
     });
     exerciseId = exercise!.id;
     firstWorkoutId = await seedWorkout(db, userId, [exerciseId]);

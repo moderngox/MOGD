@@ -52,7 +52,7 @@ describe("workout sessions", () => {
       equipment: ["cables"],
       contraindicationTags: [],
       isActive: true,
-      allowedSessionRoles: [],
+      allowedSessionRoles: ["accessory"],
     });
     exerciseId = exercise!.id;
     workoutId = await seedWorkout(db, userId, [exerciseId]); // 3 x 12-15, RIR 1-3
@@ -229,7 +229,7 @@ describe("workout sessions", () => {
       equipment: ["pull_up_bar"],
       contraindicationTags: [],
       isActive: true,
-      allowedSessionRoles: [],
+      allowedSessionRoles: ["accessory"],
     });
     await expect(logSet(db, userId, set(1, { exerciseId: other!.id }))).rejects.toThrow(ExerciseNotInWorkoutError);
   });
@@ -291,7 +291,7 @@ describe("workout sessions", () => {
         equipment: ["pull_up_bar"],
         contraindicationTags: [],
         isActive: true,
-        allowedSessionRoles: [],
+        allowedSessionRoles: ["accessory"],
       });
       const twoExerciseWorkout = await seedWorkout(db, userId, [exerciseId, other!.id]);
 

@@ -60,7 +60,7 @@ function mockExercise(
     instructions: null,
     isActive: true,
     // Permissive by default so tests exercise real role-assignment branches
-    // instead of always hitting the unconfigured fallback.
+    // instead of only ever exercising the accessory path.
     allowedSessionRoles: [...SESSION_ROLE_OPTIONS],
     preferredSessionRole: null,
     createdAt: new Date(),
@@ -404,5 +404,31 @@ describe("allocateSession", () => {
     });
     expect(slower[0]!.sessionRole).toBe("main");
     expect(slower[0]!.restSeconds).toBeGreaterThan(defaultRest);
+  });
+
+  it("skips an exercise with no allowed roles and fills the slot with the next candidate", () => {
+    const candidates = [
+      mockExercise({
+        canonicalId: "a_no_roles",
+        allowedSessionRoles: [],
+        primaryMuscles: ["upper_chest"] as CanonicalMuscleGroup[],
+        hypertrophyScore: 10,
+      }),
+      mockExercise({
+        canonicalId: "b_has_roles",
+        allowedSessionRoles: ["accessory"],
+        primaryMuscles: ["upper_chest"] as CanonicalMuscleGroup[],
+        hypertrophyScore: 1,
+      }),
+    ];
+    const result = allocateSession({
+      sessionLabel: "push",
+      candidates,
+      weeklyVolumeTargets: { upper_chest: 14 } as Record<CanonicalMuscleGroup, number>,
+      trainingBias: { hypertrophy: 0.75, strength: 0.25 },
+      sessionDurationMinutes: 30,
+    });
+    expect(result.map((e) => e.canonicalId)).toEqual(["b_has_roles"]);
+    expect(result[0]!.sessionRole).toBe("accessory");
   });
 });

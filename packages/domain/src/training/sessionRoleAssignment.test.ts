@@ -77,10 +77,9 @@ describe("assignSessionRoles", () => {
     expect(result).toEqual({ role: "finisher", roleReason: "PREFERRED_ROLE" });
   });
 
-  it("falls back to accessory-only eligibility and never crashes when unconfigured", () => {
-    const unconfigured = mockExercise({ allowedSessionRoles: [] });
-    const [result] = assignSessionRoles(scored([unconfigured]));
-    expect(result).toEqual({ role: "accessory", roleReason: "NO_CONFIG_DEFAULT_ACCESSORY" });
+  it("has no legal role for an exercise with no allowed roles, instead of defaulting to accessory", () => {
+    const empty = mockExercise({ allowedSessionRoles: [] });
+    expect(() => assignSessionRoles(scored([empty]))).toThrow(UnassignableRoleError);
   });
 
   it("does not assign finisher to a high-fatigue exercise even in the tail position", () => {
@@ -228,6 +227,42 @@ describe("applyRoleModifier with custom rules", () => {
   it("still clamps sets to the exercise's own range, whatever the rule says", () => {
     const rules = withRole("accessory", { restMultiplier: 1, setsDelta: 2 });
     expect(applyRoleModifier({ ...baseline, sets: 5 }, "accessory", bounds, rules).sets).toBe(5);
+  });
+});
+
+describe("eligibility is literal", () => {
+  const ROLES = ["main", "accessory", "superset", "finisher"] as const;
+
+  /** Every non-empty subset of the four roles, as the canonical-order lists the admin form stores. */
+  const subsets = Array.from({ length: 15 }, (_, i) => ROLES.filter((_, bit) => ((i + 1) >> bit) & 1));
+
+  it("never assigns a role outside allowedSessionRoles, for every allowed-role combination and position", () => {
+    for (const allowed of subsets) {
+      for (const preferred of [null, ...allowed]) {
+        for (const fatigueScore of [0, 5, 9]) {
+          for (const position of [0, 1, 2]) {
+            const others = [mockExercise(), mockExercise(), mockExercise()];
+            others[position] = mockExercise({
+              allowedSessionRoles: [...allowed],
+              preferredSessionRole: preferred,
+              fatigueScore,
+            });
+            const subject = others[position]!;
+
+            let roles: ReturnType<typeof assignSessionRoles>;
+            try {
+              roles = assignSessionRoles(scored(others));
+            } catch (error) {
+              // A role-less outcome is an explicit rejection, never a coerced role.
+              expect(error).toBeInstanceOf(UnassignableRoleError);
+              continue;
+            }
+            expect(allowed).toContain(roles[position]!.role);
+            expect(subject.allowedSessionRoles).toContain(roles[position]!.role);
+          }
+        }
+      }
+    }
   });
 });
 });

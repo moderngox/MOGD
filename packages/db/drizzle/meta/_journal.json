@@ -141,6 +141,13 @@
       "when": 1791752793060,
       "tag": "0019_role_rules",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1791792119346,
+      "tag": "0020_explicit_role_eligibility",
+      "breakpoints": true
     }
   ]
 }

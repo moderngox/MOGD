@@ -77,7 +77,7 @@ export interface PairingResult<T> {
  * Forms at most the configured maximum number of pairs from the already
  * role-assigned selection. A pair forms only if at least one member PREFERS
  * superset — admin intent is the trigger, so nothing nobody marked is ever
- * silently paired and unconfigured programs are unchanged. Among candidates
+ * silently paired and programs nobody marked are unchanged. Among candidates
  * the pair with the most preferring members wins; ties go to the earliest
  * (first member, then partner) in selection order. With no compatible partner
  * an exercise simply keeps its accessory role.

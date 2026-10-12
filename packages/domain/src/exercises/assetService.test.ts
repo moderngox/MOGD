@@ -22,7 +22,7 @@ const exerciseInput: CreateExerciseInput = {
   equipment: ["barbell"],
   contraindicationTags: [],
   isActive: true,
-  allowedSessionRoles: [],
+  allowedSessionRoles: ["accessory"],
 };
 
 describe("asset lifecycle", () => {

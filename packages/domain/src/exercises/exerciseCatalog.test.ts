@@ -21,7 +21,7 @@ const validInput: CreateExerciseInput = {
   equipment: ["dumbbells"],
   contraindicationTags: [],
   isActive: true,
-  allowedSessionRoles: [],
+  allowedSessionRoles: ["accessory"],
 };
 
 describe("exerciseCatalog", () => {
@@ -99,5 +99,39 @@ describe("exerciseCatalog", () => {
     await expect(
       updateExercise(db, ok!.id, { ...validInput, allowedSessionRoles: ["superset"] }),
     ).rejects.toThrow(/second role/);
+  });
+
+  describe("explicit role eligibility", () => {
+    it("rejects an empty allowed-role list on create and on update", async () => {
+      await expect(createExercise(db, { ...validInput, allowedSessionRoles: [] })).rejects.toThrow(
+        /at least one allowed role/,
+      );
+
+      const exercise = await createExercise(db, validInput);
+      await expect(updateExercise(db, exercise!.id, { ...validInput, allowedSessionRoles: [] })).rejects.toThrow(
+        /at least one allowed role/,
+      );
+      expect((await resolveActiveExercise(db, "incline_dumbbell_press"))!.allowedSessionRoles).toEqual(["accessory"]);
+    });
+
+    it("stores an explicit accessory default when roles are omitted on create", async () => {
+      const { allowedSessionRoles: _omitted, ...withoutRoles } = validInput;
+      void _omitted;
+      const created = await createExercise(db, withoutRoles as typeof validInput);
+      expect(created!.allowedSessionRoles).toEqual(["accessory"]);
+    });
+
+    it("accepts any non-empty list and keeps the preferred-role rule", async () => {
+      const created = await createExercise(db, {
+        ...validInput,
+        allowedSessionRoles: ["main", "finisher"],
+        preferredSessionRole: "main",
+      });
+      expect(created!.allowedSessionRoles).toEqual(["main", "finisher"]);
+
+      await expect(
+        createExercise(db, { ...validInput, canonicalId: "other_exercise", allowedSessionRoles: ["main"], preferredSessionRole: "finisher" }),
+      ).rejects.toThrow(/Preferred role must be one of the allowed roles/);
+    });
   });
 });

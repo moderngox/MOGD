@@ -214,11 +214,12 @@ export async function validateProgram(db: Database, plan: ProgramPlan): Promise<
 
       // The applicable trainee-level profile is re-resolved independently (not trusted
       // from the generator), then the final prescription is re-derived from it.
-      // Assigned role must be one the exercise actually allows (accessory-only
-      // when unconfigured), and a finisher must be within the fatigue ceiling.
-      const configuredRoles = resolved.allowedSessionRoles as string[];
-      const allowedRoles = configuredRoles.length === 0 ? ["accessory"] : configuredRoles;
-      if (!allowedRoles.includes(exercise.sessionRole)) {
+      // The assigned role must appear in the exercise's allowed list verbatim (no implicit
+      // default), and a finisher must be within the fatigue ceiling.
+      const allowedRoles = resolved.allowedSessionRoles as string[];
+      if (allowedRoles.length === 0) {
+        reasons.push(`"${exercise.canonicalId}" has no allowed session roles.`);
+      } else if (!allowedRoles.includes(exercise.sessionRole)) {
         reasons.push(`"${exercise.canonicalId}" was assigned role "${exercise.sessionRole}", which it is not eligible for.`);
       }
       if (exercise.sessionRole === "finisher" && (resolved.fatigueScore ?? 0) > rules.finisherFatigueCeiling) {

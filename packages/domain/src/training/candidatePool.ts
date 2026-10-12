@@ -62,6 +62,9 @@ export async function getExerciseCandidates(
   const sessionMuscles = new Set<CanonicalMuscleGroup>(SESSION_MUSCLE_MAP[input.sessionLabel]);
 
   const gated = allActive.filter((exercise) => {
+    // No allowed session role = no legal role in any session (eligibility must be explicit).
+    if (exercise.allowedSessionRoles.length === 0) return false;
+
     if (!allowedDifficulty.has(exercise.difficulty as ExerciseDifficulty)) return false;
 
     const equipmentOk =

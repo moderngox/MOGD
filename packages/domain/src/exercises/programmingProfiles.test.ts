@@ -44,7 +44,7 @@ describe("programmingProfiles", () => {
       equipment: ["cables"],
       contraindicationTags: [],
       isActive: true,
-      allowedSessionRoles: [],
+      allowedSessionRoles: ["accessory"],
     });
     exerciseId = exercise!.id;
   });
@@ -103,7 +103,7 @@ describe("programmingProfiles", () => {
       equipment: [],
       contraindicationTags: [],
       isActive: true,
-      allowedSessionRoles: [],
+      allowedSessionRoles: ["accessory"],
     });
 
     const byExercise = await listProgrammingProfilesForExercises(db, [exerciseId, other!.id]);

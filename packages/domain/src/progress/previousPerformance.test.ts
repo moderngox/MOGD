@@ -46,7 +46,7 @@ describe("session-based history", () => {
       equipment: ["cables"],
       contraindicationTags: [],
       isActive: true,
-      allowedSessionRoles: [],
+      allowedSessionRoles: ["accessory"],
     });
     exerciseId = exercise!.id;
     workoutId = await seedWorkout(db, userId, [exerciseId], PRESCRIPTION);

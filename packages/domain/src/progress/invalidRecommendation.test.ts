@@ -46,7 +46,7 @@ describe("an invalid recommendation never reaches the athlete or the snapshot", 
       equipment: ["cables"],
       contraindicationTags: [],
       isActive: true,
-      allowedSessionRoles: [],
+      allowedSessionRoles: ["accessory"],
     });
     exerciseId = exercise!.id;
     workoutId = await seedWorkout(db, userId, [exerciseId]);

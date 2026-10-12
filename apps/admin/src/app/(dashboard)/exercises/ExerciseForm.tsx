@@ -43,7 +43,8 @@ const EMPTY: ExerciseFormValue = {
   equipment: [],
   contraindicationTags: [],
   isActive: true,
-  allowedSessionRoles: [],
+  // Eligibility is explicit: a new exercise starts as accessory-eligible.
+  allowedSessionRoles: ["accessory"],
 };
 
 export function ExerciseForm({
@@ -294,10 +295,8 @@ export function ExerciseForm({
           ))}
         </Select>
 
-        {form.isActive && form.allowedSessionRoles.length === 0 && (
-          <p className="text-xs text-status-caution">
-            No allowed roles set — this exercise will only ever be assigned Accessory.
-          </p>
+        {form.allowedSessionRoles.length === 0 && (
+          <p className="text-xs text-status-warning">Select at least one allowed role.</p>
         )}
       </Card>
 

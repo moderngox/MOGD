@@ -165,6 +165,25 @@ describe("validateProgram", () => {
     expect(result.reasons.some((r) => r.includes("no enabled programming profile"))).toBe(true);
   });
 
+  describe("role eligibility", () => {
+    it("reports an exercise that has no allowed session roles, with no implicit default", async () => {
+      await db.update(schema.exercises).set({ allowedSessionRoles: [] }).where(eq(schema.exercises.id, exerciseId));
+      const plan = basePlan();
+      plan.workouts[0]!.exercises[0]!.sessionRole = "accessory";
+      plan.workouts[0]!.exercises[0]!.restSeconds = 75;
+      const result = await validateProgram(db, plan);
+      expect(result.valid).toBe(false);
+      expect(result.reasons.some((r) => r.includes("no allowed session roles"))).toBe(true);
+    });
+
+    it("checks the assigned role against the allowed list verbatim", async () => {
+      await db.update(schema.exercises).set({ allowedSessionRoles: ["accessory"] }).where(eq(schema.exercises.id, exerciseId));
+      const result = await validateProgram(db, basePlan()); // assigned "main"
+      expect(result.valid).toBe(false);
+      expect(result.reasons.some((r) => r.includes("not eligible"))).toBe(true);
+    });
+  });
+
   describe("final prescription", () => {
     const tamper = (patch: (e: ProgramPlan["workouts"][0]["exercises"][0]) => void) => {
       const plan = basePlan();

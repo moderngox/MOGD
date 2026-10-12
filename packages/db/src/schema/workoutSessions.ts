@@ -15,6 +15,7 @@ const ROLE_REASON_VALUES = [
   "ONLY_ELIGIBLE_ROLE",
   "TAIL_POSITION_FINISHER",
   "DEFAULT_ACCESSORY_FALLBACK",
+  // Historical rows only: the engine no longer emits this (empty eligibility was removed).
   "NO_CONFIG_DEFAULT_ACCESSORY",
   "SUPERSET_PAIR",
 ] as const;

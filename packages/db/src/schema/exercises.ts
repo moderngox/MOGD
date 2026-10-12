@@ -35,10 +35,11 @@ export const exercises = sqliteTable("exercise", {
    * Role ELIGIBILITY, not assignment (docs/MOGD_06-session-role-architecture.md
    * §3 core rule: "Admin defines what roles an exercise CAN/SHOULD normally
    * fulfill. The engine assigns what role the exercise IS fulfilling.").
-   * Empty array = not configured yet, never null — one "unconfigured"
-   * representation. Not enforced as "must have at least one" at this layer;
-   * that's a soft admin-form hint, not a hard constraint (would break every
-   * pre-existing row on migration day).
+   * Must list at least one role. Enforced at the write boundary
+   * (packages/domain exercises/schemas.ts) and re-checked by the candidate pool
+   * and validator; migration 0020 moved every previously empty list to
+   * ["accessory"]. No DB CHECK constraint: SQLite can't add one without
+   * rebuilding this heavily-referenced table.
    */
   allowedSessionRoles: text("allowedSessionRoles", { mode: "json" })
     .$type<string[]>()
