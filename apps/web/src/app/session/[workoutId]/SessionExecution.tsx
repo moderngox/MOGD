@@ -27,6 +27,8 @@ export interface SessionExerciseView {
   /** Shared by the two exercises of a superset pair; null otherwise. */
   supersetGroupId: string | null;
   selectionReason: string;
+  /** "assisted": the logged kg is help taken off, so lower is harder. */
+  loadType: "external" | "assisted";
   videoUrl: string | null;
   previousPerformance: { loadKg: number | null; reps: number } | null;
   progressionTarget: {
@@ -154,12 +156,12 @@ function ExerciseCard({
         <span className="text-zinc-500">Current target</span>
         <span className="text-zinc-100">
           {exercise.previousPerformance
-            ? `${exercise.previousPerformance.loadKg ?? "—"} kg × ${exercise.previousPerformance.reps}`
+            ? `${exercise.previousPerformance.loadKg ?? "—"} kg${exercise.loadType === "assisted" ? " assist" : ""} × ${exercise.previousPerformance.reps}`
             : "No previous data"}
         </span>
         <span className="text-zinc-100">
           {exercise.progressionTarget.targetLoadKg !== null
-            ? `${exercise.progressionTarget.targetLoadKg} kg × ${exercise.progressionTarget.targetRepMin}-${exercise.progressionTarget.targetRepMax}`
+            ? `${exercise.progressionTarget.targetLoadKg} kg${exercise.loadType === "assisted" ? " assist" : ""} × ${exercise.progressionTarget.targetRepMin}-${exercise.progressionTarget.targetRepMax}`
             : `${exercise.progressionTarget.targetRepMin}-${exercise.progressionTarget.targetRepMax} reps`}
         </span>
       </div>
@@ -173,7 +175,7 @@ function ExerciseCard({
           <ul className="text-sm text-zinc-400">
             {logged.map((s) => (
               <li key={s.id}>
-                Set {s.setNumber}: {s.loadKg ?? "—"} kg × {s.reps}
+                Set {s.setNumber}: {s.loadKg ?? "—"} kg{exercise.loadType === "assisted" ? " assist" : ""} × {s.reps}
               </li>
             ))}
           </ul>
@@ -188,7 +190,7 @@ function ExerciseCard({
           <div className="flex items-end gap-2">
             <Input
               type="number"
-              placeholder="Load (kg)"
+              placeholder={exercise.loadType === "assisted" ? "Assistance (kg)" : "Load (kg)"}
               value={loadInput}
               onChange={(e) => setLoadInput(e.target.value)}
               className="w-24"

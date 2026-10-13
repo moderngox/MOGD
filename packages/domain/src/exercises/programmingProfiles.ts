@@ -107,6 +107,32 @@ export async function listProgrammingProfilesForExercises(
 }
 
 /**
+ * Which trainee levels of each exercise still hold the generic seeded profile
+ * (isInheritedDefault) rather than one an admin set deliberately. Exercises with
+ * no inherited level are absent. This is how the original per-exercise rep
+ * bounds, which could not be recovered, stay visible instead of silently
+ * becoming "the" values: an admin works this list down by saving each level.
+ */
+export async function listInheritedDefaultLevels(db: Database): Promise<Map<string, ExperienceLevel[]>> {
+  const rows = await db
+    .select({
+      exerciseId: schema.exerciseProgrammingProfiles.exerciseId,
+      traineeLevel: schema.exerciseProgrammingProfiles.traineeLevel,
+    })
+    .from(schema.exerciseProgrammingProfiles)
+    .where(eq(schema.exerciseProgrammingProfiles.isInheritedDefault, true));
+
+  const byExercise = new Map<string, ExperienceLevel[]>();
+  for (const row of rows) {
+    const levels = byExercise.get(row.exerciseId) ?? [];
+    levels.push(row.traineeLevel as ExperienceLevel);
+    byExercise.set(row.exerciseId, levels);
+  }
+  for (const levels of byExercise.values()) levels.sort((a, b) => LEVEL_ORDER.indexOf(a) - LEVEL_ORDER.indexOf(b));
+  return byExercise;
+}
+
+/**
  * Picks the profile to prescribe from for a given trainee level, pure and
  * deterministic — used both at generation time (candidatePool.ts) and
  * independently re-derived by validator.ts (never trust upstream).

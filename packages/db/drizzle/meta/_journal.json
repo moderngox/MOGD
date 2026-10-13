@@ -148,6 +148,20 @@
       "when": 1791792119346,
       "tag": "0020_explicit_role_eligibility",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "6",
+      "when": 1791832466345,
+      "tag": "0021_exercise_load_type",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "6",
+      "when": 1791832752802,
+      "tag": "0022_restriction_taxonomy",
+      "breakpoints": true
     }
   ]
 }

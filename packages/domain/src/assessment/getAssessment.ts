@@ -137,6 +137,7 @@ export async function getAssessmentFormState(
     trainingHistoryNotes: training.trainingHistoryNotes ?? undefined,
     limitations: training.limitations ?? undefined,
     injuryRestrictions: training.injuryRestrictions ?? undefined,
+    restrictionKeys: training.restrictionKeys,
     sessionsPerWeek: training.sessionsPerWeek,
     sessionDurationMinutes: training.sessionDurationMinutes,
     trainingContext: training.trainingContext as AssessmentDraftFormState["trainingContext"],

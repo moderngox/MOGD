@@ -85,7 +85,7 @@ describe("the programming loop, end to end", () => {
     throw new Error("exercise not in any workout");
   }
 
-  const nextTarget = (userId: string, exerciseId: string, p: { sets: number; repMin: number; repMax: number; rirMin: number; rirMax: number }, locationId: string | null) =>
+  const nextTarget = (userId: string, exerciseId: string, p: { sets: number; repMin: number; repMax: number; rirMin: number; rirMax: number; restSeconds: number; sessionRole: string | null }, locationId: string | null) =>
     getProgressionTargetForExercise(db, userId, exerciseId, p, { locationId });
 
   it("admin config -> generate -> log -> next-session recommendation, across regeneration and equipment", async () => {
@@ -213,6 +213,30 @@ describe("the programming loop, end to end", () => {
     expect(await nextTarget(userId, lateralRaise.id, slot.prescription, gym.id)).toMatchObject({
       reason: "CONTEXT_CHANGED",
       targetLoadKg: null,
+    });
+
+    // --- RULES CHANGE: slower accessory rest changes the prescription's rest but not its rep/RIR range.
+    // The athlete keeps their load, is not told to progress on evidence gathered under other conditions,
+    // and normal progression resumes after one session under the new conditions.
+    const beforeEdit = slot.prescription;
+    await saveRoleRules(db, null, {
+      ...DEFAULT_ROLE_RULES,
+      roles: { ...DEFAULT_ROLE_RULES.roles, main: { restMultiplier: 1.5 }, accessory: { restMultiplier: 1.2 } },
+    }, "longer accessory rest");
+    expect((await generateProgram(db, userId)).success).toBe(true);
+    slot = await slotFor(userId, lateralRaise.id);
+    expect(slot.prescription.restSeconds).toBeGreaterThan(beforeEdit.restSeconds);
+    expect(slot.prescription).toMatchObject({ repMin: 12, repMax: 15, rirMin: 1, rirMax: 3, sessionRole: "accessory" });
+
+    expect(await nextTarget(userId, lateralRaise.id, slot.prescription, home.id)).toMatchObject({
+      reason: "PRESCRIPTION_CHANGED",
+      targetLoadKg: 10,
+      loadInstruction: null,
+    });
+    await perform(slot.workoutId, 10, 15, 0, home.id);
+    expect(await nextTarget(userId, lateralRaise.id, slot.prescription, home.id)).toMatchObject({
+      reason: "INCREASE_LOAD",
+      targetLoadKg: 12.5,
     });
   });
 });

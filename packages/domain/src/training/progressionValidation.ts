@@ -1,3 +1,4 @@
+import type { LoadType } from "../exercises/options";
 import { PROGRESSION_REASON_OPTIONS, type ProgressionPrescription, type ProgressionTarget } from "./progression";
 
 /**
@@ -18,6 +19,10 @@ export interface RecommendationContext {
   currentPrescription: ProgressionPrescription;
   /** Every load logged for this exercise in this equipment context — the only evidence a load may come from. */
   observedLoadsKg: number[];
+  /** Whether more kg is harder ("external") or easier ("assisted"); decides which way a load may move. */
+  loadType: LoadType;
+  /** The kg of each set of the most recent occurrence (null = no load logged), in the order logged. */
+  recentLoadsKg: (number | null)[];
 }
 
 const MAX_LOAD_KG = 500; // the logging bound
@@ -37,6 +42,22 @@ function derivableLoads(observed: number[]): number[] {
   return [...distinct, ...distinct.flatMap((l) => [round2(l + smallestGap!), round2(l - smallestGap!)])];
 }
 
+/**
+ * The load the last session was done at: the most frequent kg, nulls counted as 0 only when some
+ * set had a load. Ties go to the harder one for the exercise's load type. Null = no loaded work.
+ */
+function lastWorkingLoad(recent: (number | null)[], loadType: LoadType): number | null {
+  if (recent.length === 0) return null;
+  const anyLoaded = recent.some((l) => l !== null);
+  if (!anyLoaded) return null;
+  const tally = new Map<number, number>();
+  for (const l of recent) tally.set(round2(l ?? 0), (tally.get(round2(l ?? 0)) ?? 0) + 1);
+  const top = Math.max(...tally.values());
+  const tied = [...tally.entries()].filter(([, n]) => n === top).map(([kg]) => kg);
+  const kg = loadType === "assisted" ? Math.min(...tied) : Math.max(...tied);
+  return kg > 0 ? kg : null;
+}
+
 /** Empty array = valid. */
 export function validateProgressionTarget(target: ProgressionTarget, context: RecommendationContext): string[] {
   const failures: string[] = [];
@@ -50,6 +71,14 @@ export function validateProgressionTarget(target: ProgressionTarget, context: Re
   if (target.reason === "NO_LOAD_HISTORY" || target.reason === "CONTEXT_CHANGED") {
     if (target.targetLoadKg !== null) failures.push(`${target.reason} must not carry a load`);
     if (target.loadInstruction !== null) failures.push(`${target.reason} must not carry a load instruction`);
+  }
+
+  // A held load is one the athlete actually used, never an inferred step.
+  if (target.reason === "PRESCRIPTION_CHANGED" && target.targetLoadKg !== null) {
+    const load = target.targetLoadKg;
+    if (!context.observedLoadsKg.some((l) => Math.abs(round2(l) - load) < EPSILON)) {
+      failures.push(`PRESCRIPTION_CHANGED must hold a logged load, but ${load} kg was never logged`);
+    }
   }
 
   // A load change with no number must say what to do; a number needs no instruction.
@@ -70,6 +99,24 @@ export function validateProgressionTarget(target: ProgressionTarget, context: Re
       failures.push(`load ${load} kg is outside 0-${MAX_LOAD_KG} kg`);
     } else if (!derivableLoads(context.observedLoadsKg).some((l) => Math.abs(l - load) < EPSILON)) {
       failures.push(`load ${load} kg is not backed by logged history (invented)`);
+    }
+  }
+
+  // A numbered change must move the way its reason says: harder is more kg for added weight, fewer for assistance.
+  if (
+    (target.reason === "INCREASE_LOAD" || target.reason === "REDUCE_LOAD") &&
+    target.targetLoadKg !== null
+  ) {
+    const working = lastWorkingLoad(context.recentLoadsKg, context.loadType);
+    if (working !== null) {
+      const wantsHigherNumber = (target.reason === "INCREASE_LOAD") === (context.loadType === "external");
+      const movesUp = target.targetLoadKg > working;
+      const movesDown = target.targetLoadKg < working;
+      if (wantsHigherNumber ? !movesUp : !movesDown) {
+        failures.push(
+          `${target.reason} on a${context.loadType === "assisted" ? "n assisted" : "n external"} load must ${wantsHigherNumber ? "raise" : "lower"} the kg (from ${working} to ${target.targetLoadKg})`,
+        );
+      }
     }
   }
 

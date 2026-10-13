@@ -1,4 +1,5 @@
 import { sqliteTable, text, integer, real, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { sql } from "drizzle-orm";
 import { users } from "./auth";
 
 /**
@@ -76,6 +77,9 @@ export const trainingProfiles = sqliteTable("training_profile", {
   trainingHistoryNotes: text("trainingHistoryNotes"),
   limitations: text("limitations"),
   injuryRestrictions: text("injuryRestrictions"),
+  // Keys of restriction_category the athlete reported. The free-text fields above are stored
+  // and shown back, never matched; only these structured keys filter exercises.
+  restrictionKeys: text("restrictionKeys", { mode: "json" }).$type<string[]>().notNull().default(sql`'[]'`),
   sessionsPerWeek: integer("sessionsPerWeek").notNull(),
   sessionDurationMinutes: integer("sessionDurationMinutes").notNull(),
   trainingContext: text("trainingContext", { mode: "json" }).$type<string[]>().notNull(),

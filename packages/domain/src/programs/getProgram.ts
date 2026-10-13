@@ -3,7 +3,7 @@ import { schema, type Database } from "@mogd/db";
 import { getPublishedAsset } from "../exercises/assetService";
 import { explainExerciseSelection } from "../training/explainSelection";
 import type { SessionLabel } from "../training/splitTemplates";
-import type { SessionRole } from "../exercises/options";
+import type { LoadType, SessionRole } from "../exercises/options";
 
 export interface ProgramWorkoutExerciseView {
   workoutExerciseId: string;
@@ -24,6 +24,8 @@ export interface ProgramWorkoutExerciseView {
   supersetGroupId: string | null;
   videoObjectKey: string | null;
   selectionReason: string;
+  /** What a logged load means for this exercise (assistance vs added weight). */
+  loadType: LoadType;
 }
 
 export interface ProgramWorkoutView {
@@ -71,6 +73,7 @@ export async function getCurrentProgram(db: Database, userId: string): Promise<P
         supersetGroupId: schema.workoutExercises.supersetGroupId,
         canonicalId: schema.exercises.canonicalId,
         name: schema.exercises.name,
+        loadType: schema.exercises.loadType,
         instructions: schema.exercises.instructions,
         primaryMuscles: schema.exercises.primaryMuscles,
         secondaryMuscles: schema.exercises.secondaryMuscles,
@@ -143,6 +146,7 @@ export async function getWorkout(db: Database, workoutId: string): Promise<Progr
         supersetGroupId: schema.workoutExercises.supersetGroupId,
       canonicalId: schema.exercises.canonicalId,
       name: schema.exercises.name,
+      loadType: schema.exercises.loadType,
       instructions: schema.exercises.instructions,
       primaryMuscles: schema.exercises.primaryMuscles,
       secondaryMuscles: schema.exercises.secondaryMuscles,

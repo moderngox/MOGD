@@ -133,14 +133,23 @@ const LAST_STEP = STEP_TITLES.length - 1;
 export function AssessmentWizard({
   photosAvailable,
   initialDraft,
+  restrictionCategories,
 }: {
   photosAvailable: boolean;
   initialDraft: assessment.AssessmentDraft | null;
+  /** Admin-defined restriction categories; empty means the question is not asked. */
+  restrictionCategories: { key: string; label: string }[];
 }) {
   const router = useRouter();
   const [started, setStarted] = useState(initialDraft !== null);
   const [step, setStep] = useState(() => Math.min(initialDraft?.step ?? 0, LAST_STEP));
-  const [form, setForm] = useState<FormState>(() => ({ ...INITIAL_FORM, ...initialDraft?.formState }));
+  const [form, setForm] = useState<FormState>(() => {
+    const restored = { ...INITIAL_FORM, ...initialDraft?.formState };
+    // Only categories that are listed can be shown, so only those are carried: what the athlete
+    // sees ticked is exactly what gets submitted (a category removed since the draft was saved drops out visibly).
+    const offered = new Set(restrictionCategories.map((c) => c.key));
+    return { ...restored, restrictionKeys: (restored.restrictionKeys ?? []).filter((key) => offered.has(key)) };
+  });
   const [photoFiles, setPhotoFiles] = useState<{ front?: File; side?: File }>({});
   const [consent, setConsent] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -229,6 +238,11 @@ export function AssessmentWizard({
       "trainingContext",
       current.includes(value) ? current.filter((v) => v !== value) : [...current, value],
     );
+  }
+
+  function toggleRestriction(key: string) {
+    const current = form.restrictionKeys ?? [];
+    set("restrictionKeys", current.includes(key) ? current.filter((k) => k !== key) : [...current, key]);
   }
 
   function toggleEquipment(value: (typeof EQUIPMENT_OPTIONS)[number]) {
@@ -586,6 +600,28 @@ export function AssessmentWizard({
                 ))}
               </div>
             </div>
+            {restrictionCategories.length > 0 && (
+              <div className="flex flex-col gap-2">
+                <span className="text-sm font-medium text-fg-secondary-alt">Anything we should train around?</span>
+                <p className="text-xs text-fg-secondary">
+                  Exercises that are unsuitable for what you select are left out of your program. MOGᴰ doesn&apos;t
+                  diagnose or treat injuries; the notes below are kept for your reference and are not used to choose
+                  exercises.
+                </p>
+                <div role="group" aria-label="Restrictions that apply to you" className="flex flex-wrap gap-2">
+                  {restrictionCategories.map((c) => (
+                    <ChoiceCard
+                      key={c.key}
+                      role="checkbox"
+                      variant="pill"
+                      label={c.label}
+                      selected={(form.restrictionKeys ?? []).includes(c.key)}
+                      onSelect={() => toggleRestriction(c.key)}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
             <Textarea
               placeholder="Training history (optional)"
               value={form.trainingHistoryNotes ?? ""}

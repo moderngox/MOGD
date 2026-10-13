@@ -3,6 +3,7 @@ import { createTestDatabase } from "@mogd/db/testUtils";
 import { type Database } from "@mogd/db";
 import { createExercise } from "./exerciseCatalog";
 import {
+  listInheritedDefaultLevels,
   listProgrammingProfiles,
   listProgrammingProfilesForExercises,
   resolveApplicableProfile,
@@ -90,6 +91,35 @@ describe("programmingProfiles", () => {
     await expect(upsertProgrammingProfile(db, "does-not-exist", "beginner", VALID_PROFILE_INPUT)).rejects.toThrow(
       ExerciseNotFoundError,
     );
+  });
+
+  it("lists the levels still on the generic default, and drops them as an admin reviews each one", async () => {
+    const other = await createExercise(db, {
+      canonicalId: "romanian_deadlift",
+      name: "Romanian Deadlift",
+      movementPattern: "hinge",
+      difficulty: "intermediate",
+      primaryMuscles: ["hamstrings"],
+      secondaryMuscles: [],
+      equipment: [],
+      contraindicationTags: [],
+      isActive: true,
+      allowedSessionRoles: ["accessory"],
+    });
+
+    let inherited = await listInheritedDefaultLevels(db);
+    expect(inherited.get(exerciseId)).toEqual(["beginner", "intermediate", "advanced"]);
+    expect(inherited.get(other!.id)).toEqual(["beginner", "intermediate", "advanced"]);
+
+    await upsertProgrammingProfile(db, exerciseId, "intermediate", VALID_PROFILE_INPUT);
+    inherited = await listInheritedDefaultLevels(db);
+    expect(inherited.get(exerciseId)).toEqual(["beginner", "advanced"]);
+
+    await upsertProgrammingProfile(db, exerciseId, "beginner", VALID_PROFILE_INPUT);
+    await upsertProgrammingProfile(db, exerciseId, "advanced", VALID_PROFILE_INPUT);
+    inherited = await listInheritedDefaultLevels(db);
+    expect(inherited.has(exerciseId)).toBe(false); // fully reviewed: absent, not an empty list
+    expect(inherited.has(other!.id)).toBe(true);
   });
 
   it("batches profile lookups for multiple exercises with listProgrammingProfilesForExercises", async () => {

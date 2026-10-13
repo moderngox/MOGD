@@ -72,6 +72,7 @@ describe("getExerciseCandidates", () => {
       sessionLabel: "push",
       experienceLevel: "advanced",
       equipment: ["barbell", "dumbbells"],
+      restrictionKeys: [],
     });
     expect(candidates.some((c) => c.canonicalId === "retired_move")).toBe(false);
   });
@@ -81,6 +82,7 @@ describe("getExerciseCandidates", () => {
       sessionLabel: "legs",
       experienceLevel: "advanced",
       equipment: ["dumbbells"],
+      restrictionKeys: [],
     });
     expect(candidates.some((c) => c.canonicalId === "barbell_back_squat")).toBe(false);
   });
@@ -90,6 +92,7 @@ describe("getExerciseCandidates", () => {
       sessionLabel: "legs",
       experienceLevel: "beginner",
       equipment: ["barbell"],
+      restrictionKeys: [],
     });
     expect(candidates.some((c) => c.canonicalId === "barbell_back_squat")).toBe(false);
   });
@@ -99,6 +102,7 @@ describe("getExerciseCandidates", () => {
       sessionLabel: "pull",
       experienceLevel: "advanced",
       equipment: ["dumbbells", "barbell"],
+      restrictionKeys: [],
     });
     // incline_dumbbell_press targets chest/triceps, not a pull-session muscle
     expect(candidates.some((c) => c.canonicalId === "incline_dumbbell_press")).toBe(false);
@@ -109,6 +113,7 @@ describe("getExerciseCandidates", () => {
       sessionLabel: "push",
       experienceLevel: "intermediate",
       equipment: ["dumbbells"],
+      restrictionKeys: [],
     });
     expect(candidates.map((c) => c.canonicalId)).toContain("incline_dumbbell_press");
   });
@@ -118,6 +123,7 @@ describe("getExerciseCandidates", () => {
       sessionLabel: "push",
       experienceLevel: "intermediate",
       equipment: ["dumbbells"],
+      restrictionKeys: [],
     });
     expect(candidate?.programmingProfile.traineeLevel).toBe("intermediate");
   });
@@ -135,6 +141,7 @@ describe("getExerciseCandidates", () => {
       sessionLabel: "push",
       experienceLevel: "intermediate",
       equipment: ["dumbbells"],
+      restrictionKeys: [],
     });
     expect(candidate?.programmingProfile.traineeLevel).toBe("beginner");
   });
@@ -154,6 +161,7 @@ describe("getExerciseCandidates", () => {
       sessionLabel: "push",
       experienceLevel: "intermediate",
       equipment: ["dumbbells"],
+      restrictionKeys: [],
     });
     expect(candidates.some((c) => c.canonicalId === "incline_dumbbell_press")).toBe(false);
   });
@@ -170,6 +178,7 @@ describe("getExerciseCandidates", () => {
       sessionLabel: "push",
       experienceLevel: "intermediate",
       equipment: ["dumbbells"],
+      restrictionKeys: [],
     });
     expect(candidates.some((c) => c.canonicalId === "incline_dumbbell_press")).toBe(false);
   });

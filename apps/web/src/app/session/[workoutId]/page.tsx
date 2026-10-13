@@ -82,6 +82,8 @@ export default async function SessionPage({
             repMax: exercise.repMax,
             rirMin: exercise.rirMin,
             rirMax: exercise.rirMax,
+            restSeconds: exercise.restSeconds,
+            sessionRole: exercise.sessionRole,
           },
           history,
         );
@@ -90,6 +92,7 @@ export default async function SessionPage({
       workoutExerciseId: exercise.workoutExerciseId,
       exerciseId: exercise.exerciseId,
       name: exercise.name,
+      loadType: exercise.loadType,
       sets: prescription.sets,
       repMin: prescription.repMin,
       repMax: prescription.repMax,

@@ -3,6 +3,7 @@ import { schema, type Database } from "@mogd/db";
 import { createExerciseInput, updateExerciseInput } from "./schemas";
 import type { CreateExerciseInput, UpdateExerciseInput } from "./schemas";
 import { createDefaultProgrammingProfiles } from "./programmingProfiles";
+import { assertKnownRestrictionKeys } from "../safety/restrictions";
 
 export class DuplicateCanonicalIdError extends Error {
   constructor(canonicalId: string) {
@@ -13,6 +14,7 @@ export class DuplicateCanonicalIdError extends Error {
 
 export async function createExercise(db: Database, rawInput: CreateExerciseInput) {
   const input = createExerciseInput.parse(rawInput);
+  await assertKnownRestrictionKeys(db, input.contraindicationTags);
 
   const [existing] = await db
     .select({ id: schema.exercises.id })
@@ -35,6 +37,7 @@ export async function createExercise(db: Database, rawInput: CreateExerciseInput
 /** canonicalId is immutable — this never accepts or touches it. */
 export async function updateExercise(db: Database, id: string, rawInput: UpdateExerciseInput) {
   const input = updateExerciseInput.parse(rawInput);
+  await assertKnownRestrictionKeys(db, input.contraindicationTags);
 
   const [exercise] = await db
     .update(schema.exercises)

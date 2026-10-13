@@ -26,6 +26,8 @@ export interface PerformedPrescription {
   repMax: number;
   rirMin: number;
   rirMax: number;
+  restSeconds: number;
+  sessionRole: string | null;
 }
 
 export interface RecentSessionPerformance {
@@ -110,6 +112,8 @@ export async function getRecentSessionPerformance(
             repMax: performance.repMax,
             rirMin: performance.rirMin,
             rirMax: performance.rirMax,
+            restSeconds: performance.restSeconds,
+            sessionRole: performance.sessionRole,
           },
   };
 }
@@ -195,8 +199,14 @@ export async function getProgressionTargetForExercise(
   const observedLoadsKg = await getObservedLoadsKg(db, userId, exerciseId, context);
   const hasOtherContext =
     recent.sets.length === 0 && (await hasHistoryInOtherContext(db, userId, exerciseId, context.locationId));
+  const [exercise] = await db
+    .select({ loadType: schema.exercises.loadType })
+    .from(schema.exercises)
+    .where(eq(schema.exercises.id, exerciseId));
+  if (!exercise) throw new Error(`Exercise ${exerciseId} not found`);
 
   const target = computeProgressionTarget({
+    loadType: exercise.loadType,
     recentSets: recent.sets.map((s) => ({
       reps: s.reps,
       loadKg: s.loadKg,
@@ -211,7 +221,12 @@ export async function getProgressionTargetForExercise(
   });
 
   // A second, independent opinion before anything is shown or snapshotted.
-  const failures = validateProgressionTarget(target, { currentPrescription: prescription, observedLoadsKg });
+  const failures = validateProgressionTarget(target, {
+    currentPrescription: prescription,
+    observedLoadsKg,
+    loadType: exercise.loadType,
+    recentLoadsKg: recent.sets.map((s) => s.loadKg),
+  });
   if (failures.length > 0) throw new InvalidRecommendationError(failures);
   return target;
 }

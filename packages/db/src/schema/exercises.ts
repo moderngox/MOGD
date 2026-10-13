@@ -5,6 +5,8 @@ import { sql } from "drizzle-orm";
  * SESSION_ROLE_OPTIONS — packages/db never imports from packages/domain
  * (same convention already used by exerciseRelationships.ts's enum). */
 const SESSION_ROLE_VALUES = ["main", "accessory", "superset", "finisher"] as const;
+/** Same convention, for LOAD_TYPE_OPTIONS in packages/domain/src/exercises/options.ts. */
+const LOAD_TYPE_VALUES = ["external", "assisted"] as const;
 
 /**
  * Canonical exercise identity + programming metadata (docs/ARCHITECTURE.md
@@ -28,6 +30,13 @@ export const exercises = sqliteTable("exercise", {
   strengthScore: real("strengthScore"),
   fatigueScore: real("fatigueScore"),
   stabilityDemand: real("stabilityDemand"),
+  /**
+   * What a logged loadKg means. "external": weight added (more = harder).
+   * "assisted": weight taken off, e.g. an assisted pull-up machine (more =
+   * easier), so progression moves the number the other way. Bodyweight work is
+   * not a type: it is simply an exercise whose sets carry no load.
+   */
+  loadType: text("loadType", { enum: LOAD_TYPE_VALUES }).notNull().default("external"),
   contraindicationTags: text("contraindicationTags", { mode: "json" }).$type<string[]>().notNull(),
   instructions: text("instructions"),
   isActive: integer("isActive", { mode: "boolean" }).notNull().default(true),

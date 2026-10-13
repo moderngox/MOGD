@@ -1,4 +1,5 @@
 import type { Database } from "@mogd/db";
+import { conflictingRestrictions } from "../safety/restrictions";
 import type { Equipment, ExperienceLevel } from "../assessment/options";
 import { resolveActiveExercise } from "../exercises/exerciseCatalog";
 import { listProgrammingProfiles, resolveApplicableProfile } from "../exercises/programmingProfiles";
@@ -25,6 +26,8 @@ export interface ProgramPlan {
   sessionDurationMinutes: number;
   equipment: Equipment[];
   experienceLevel: ExperienceLevel;
+  /** Restriction categories the athlete reported; no exercise in the plan may list any of them. */
+  restrictionKeys: string[];
   /** The role-rules revision the plan was built under (null = built-in defaults); the validator re-reads it itself. */
   roleRulesRevisionId: string | null;
   workouts: ProgramWorkoutPlan[];
@@ -210,6 +213,14 @@ export async function validateProgram(db: Database, plan: ProgramPlan): Promise<
         resolved.equipment.length === 0 || resolved.equipment.every((e) => userEquipment.has(e));
       if (!equipmentOk) {
         reasons.push(`"${exercise.canonicalId}" requires equipment the user doesn't have.`);
+      }
+
+      // Re-checked against the live tags, independently of the candidate filter.
+      const conflicts = conflictingRestrictions(resolved.contraindicationTags, plan.restrictionKeys);
+      if (conflicts.length > 0) {
+        reasons.push(
+          `"${exercise.canonicalId}" is marked unsuitable for a restriction the user reported (${conflicts.join(", ")}).`,
+        );
       }
 
       // The applicable trainee-level profile is re-resolved independently (not trusted

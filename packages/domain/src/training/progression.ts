@@ -7,6 +7,8 @@
  * rule 4: AI may explain this, never override it.
  */
 
+import type { LoadType } from "../exercises/options";
+
 const LOAD_EPSILON = 0.001;
 
 /**
@@ -46,6 +48,7 @@ export function resolveKnownNextLoad(
 export const PROGRESSION_REASON_OPTIONS = [
   "NO_LOAD_HISTORY",
   "CONTEXT_CHANGED",
+  "PRESCRIPTION_CHANGED",
   "REASSESS_DUE_TO_PAIN",
   "HOLD_FOR_TECHNIQUE",
   "CONTINUE_CURRENT_LOAD",
@@ -70,9 +73,14 @@ export interface ProgressionPrescription {
   repMax: number;
   rirMin: number;
   rirMax: number;
+  restSeconds: number;
+  /** Null for slots generated before roles existed; a null on either side is never counted as a change. */
+  sessionRole: string | null;
 }
 
 export interface ProgressionInput {
+  /** What the logged kg means: "external" = added weight (more is harder), "assisted" = weight taken off (more is easier). */
+  loadType: LoadType;
   /** Sets of the most recent other occurrence in THIS equipment context; empty when none. */
   recentSets: LoggedSetForProgression[];
   /** What that occurrence was prescribed; null = unknown (legacy history), treated as the current one. */
@@ -96,22 +104,40 @@ export interface ProgressionTarget {
   message: string;
 }
 
-function samePrescription(a: ProgressionPrescription, b: ProgressionPrescription): boolean {
+/** A different rep or RIR range implies a different load, so the old load is not carried over. */
+function sameTargetRange(a: ProgressionPrescription, b: ProgressionPrescription): boolean {
   return a.repMin === b.repMin && a.repMax === b.repMax && a.rirMin === b.rirMin && a.rirMax === b.rirMax;
 }
 
 /**
- * The load most of the sets were done at (ties -> heaviest); a null load among
- * loaded sets counts as 0. Sets at other loads are warm-up/drop sets and are
- * not judged. Returns null for bodyweight work (no working set has a load).
+ * Same rep/RIR range but a different set count, rest or role. The old load is
+ * still a fair starting point (the range it was earned in is unchanged), but
+ * its progression evidence was gathered under other conditions, so it is held
+ * rather than increased.
  */
-function resolveWorkingSets(sets: LoggedSetForProgression[]): { working: LoggedSetForProgression[]; loadKg: number | null } {
+function sameLoadingConditions(a: ProgressionPrescription, b: ProgressionPrescription): boolean {
+  const sameRole = a.sessionRole === null || b.sessionRole === null || a.sessionRole === b.sessionRole;
+  return a.sets === b.sets && a.restSeconds === b.restSeconds && sameRole;
+}
+
+/**
+ * The load most of the sets were done at (ties -> the harder one: heaviest when
+ * the load is added weight, lightest when it is assistance); a null load among
+ * loaded sets counts as 0. Sets at other loads are warm-up/drop sets and are
+ * not judged. Returns null for bodyweight work (no working set has a load, or
+ * for an assisted exercise the assistance was fully removed).
+ */
+function resolveWorkingSets(
+  sets: LoggedSetForProgression[],
+  loadType: LoadType,
+): { working: LoggedSetForProgression[]; loadKg: number | null } {
   const anyLoaded = sets.some((s) => s.loadKg !== null);
   const loadOf = (s: LoggedSetForProgression) => (anyLoaded ? (s.loadKg ?? 0) : 0);
 
   const counts = new Map<number, number>();
   for (const s of sets) counts.set(loadOf(s), (counts.get(loadOf(s)) ?? 0) + 1);
-  const workingLoad = [...counts.entries()].sort((a, b) => b[1] - a[1] || b[0] - a[0])[0]![0];
+  const harderFirst = loadType === "assisted" ? (a: number, b: number) => a - b : (a: number, b: number) => b - a;
+  const workingLoad = [...counts.entries()].sort((a, b) => b[1] - a[1] || harderFirst(a[0], b[0]))[0]![0];
 
   return {
     working: sets.filter((s) => loadOf(s) === workingLoad),
@@ -123,12 +149,13 @@ function resolveWorkingSets(sets: LoggedSetForProgression[]): { working: LoggedS
  * Decision order (first match wins):
  *  1. no sets in this context                            -> CONTEXT_CHANGED (done elsewhere) / NO_LOAD_HISTORY
  *  2. any set flagged pain                               -> REASSESS_DUE_TO_PAIN (safety outranks everything below)
- *  3. last prescription differs from today's             -> CONTEXT_CHANGED (a different rep/RIR range implies a different load)
+ *  3. last rep/RIR range differs from today's            -> CONTEXT_CHANGED (a different range implies a different load)
  *  4. any set flagged invalid technique                  -> HOLD_FOR_TECHNIQUE
- *  5. fewer working sets than were prescribed            -> CONTINUE_CURRENT_LOAD
- *  6. working sets hit repMax within RIR, RIR logged     -> INCREASE_LOAD (known load, else null + instruction; never invented)
- *  7. weakest working set missed repMin at RIR <= 0      -> REDUCE_LOAD (same sourcing)
- *  8. otherwise                                          -> CONTINUE_REP_PROGRESSION
+ *  5. last set count, rest or role differs from today's  -> PRESCRIPTION_CHANGED (repeat the load; no increase or reduction yet)
+ *  6. fewer working sets than were prescribed            -> CONTINUE_CURRENT_LOAD
+ *  7. working sets hit repMax within RIR, RIR logged     -> INCREASE_LOAD (known load, else null + instruction; never invented)
+ *  8. weakest working set missed repMin at RIR <= 0      -> REDUCE_LOAD (same sourcing)
+ *  9. otherwise                                          -> CONTINUE_REP_PROGRESSION
  * Achievement is judged against the PREVIOUS prescription; targets are
  * expressed in the CURRENT one (identical once rule 3 passes).
  */
@@ -158,7 +185,7 @@ export function computeProgressionTarget(input: ProgressionInput): ProgressionTa
   }
 
   const previous = input.previousPrescription ?? current;
-  const { working, loadKg: workingLoad } = resolveWorkingSets(recentSets);
+  const { working, loadKg: workingLoad } = resolveWorkingSets(recentSets, input.loadType);
 
   if (recentSets.some((s) => s.painFlag === true)) {
     return {
@@ -172,7 +199,7 @@ export function computeProgressionTarget(input: ProgressionInput): ProgressionTa
     };
   }
 
-  if (!samePrescription(previous, current)) {
+  if (!sameTargetRange(previous, current)) {
     return {
       targetLoadKg: null,
       ...base,
@@ -193,6 +220,17 @@ export function computeProgressionTarget(input: ProgressionInput): ProgressionTa
     };
   }
 
+  if (!sameLoadingConditions(previous, current)) {
+    return {
+      targetLoadKg: workingLoad,
+      ...base,
+      reason: "PRESCRIPTION_CHANGED",
+      loadInstruction: null,
+      message:
+        "Your sets, rest or role for this exercise changed since last time — repeat last session's load at today's target before progressing.",
+    };
+  }
+
   if (working.length < previous.sets) {
     return {
       targetLoadKg: workingLoad,
@@ -204,6 +242,9 @@ export function computeProgressionTarget(input: ProgressionInput): ProgressionTa
   }
 
   const bodyweight = workingLoad === null;
+  // "Harder" is more kg for added weight, fewer kg for assistance; the reason codes keep their meaning
+  // (INCREASE_LOAD = harder) and only the direction of the number flips.
+  const assisted = input.loadType === "assisted";
   const worstReps = Math.min(...working.map((s) => s.reps));
   const upperRepTargetAchieved = working.every((s) => s.reps >= previous.repMax);
   const rirMissing = working.some((s) => s.rir === null);
@@ -222,11 +263,13 @@ export function computeProgressionTarget(input: ProgressionInput): ProgressionTa
   }
 
   if (upperRepTargetAchieved && rirTargetSatisfied) {
-    const nextLoad = bodyweight ? null : resolveKnownNextLoad(observedLoadsKg, workingLoad, "up");
+    const nextLoad = bodyweight ? null : resolveKnownNextLoad(observedLoadsKg, workingLoad, assisted ? "down" : "up");
     const instruction = bodyweight
       ? "Add external load or move to a harder variation."
       : nextLoad === null
-        ? "Increase to the smallest available resistance increment."
+        ? assisted
+          ? "Reduce the assistance to the next lower setting."
+          : "Increase to the smallest available resistance increment."
         : null;
     return {
       targetLoadKg: nextLoad,
@@ -235,20 +278,26 @@ export function computeProgressionTarget(input: ProgressionInput): ProgressionTa
       loadInstruction: instruction,
       message: bodyweight
         ? "Hit the top of the rep range within the target RIR — time to progress. There's no external load to raise, so add some or move to a harder variation, then restart the rep range."
-        : nextLoad === null
-          ? "Hit the top of the rep range within the target RIR — time to progress. Your next available increment isn't known yet, so move up by the smallest available step and restart the rep range."
-          : "Hit the top of the rep range within the target RIR — increase to your next known load and restart the rep range.",
+        : assisted
+          ? nextLoad === null
+            ? "Hit the top of the rep range within the target RIR — time to progress. Your next assistance setting isn't known yet, so reduce the assistance by the smallest available step and restart the rep range."
+            : "Hit the top of the rep range within the target RIR — reduce the assistance to your next known lower setting and restart the rep range."
+          : nextLoad === null
+            ? "Hit the top of the rep range within the target RIR — time to progress. Your next available increment isn't known yet, so move up by the smallest available step and restart the rep range."
+            : "Hit the top of the rep range within the target RIR — increase to your next known load and restart the rep range.",
     };
   }
 
   const failedAtFloor =
     worstReps < previous.repMin && working.some((s) => s.reps === worstReps && s.rir !== null && s.rir <= 0);
   if (failedAtFloor) {
-    const nextLoad = bodyweight ? null : resolveKnownNextLoad(observedLoadsKg, workingLoad, "down");
+    const nextLoad = bodyweight ? null : resolveKnownNextLoad(observedLoadsKg, workingLoad, assisted ? "up" : "down");
     const instruction = bodyweight
       ? "Use an easier variation or add assistance."
       : nextLoad === null
-        ? "Reduce to the next lighter available resistance."
+        ? assisted
+          ? "Add assistance: move to the next higher setting."
+          : "Reduce to the next lighter available resistance."
         : null;
     return {
       targetLoadKg: nextLoad,
@@ -257,9 +306,13 @@ export function computeProgressionTarget(input: ProgressionInput): ProgressionTa
       loadInstruction: instruction,
       message: bodyweight
         ? "Fell below the rep floor at RIR 0 — drop to an easier variation and rebuild."
-        : nextLoad === null
-          ? "Fell below the rep floor at RIR 0 — drop to the next lighter available resistance and rebuild."
-          : "Fell below the rep floor at RIR 0 — reduce to your next known lighter load and rebuild.",
+        : assisted
+          ? nextLoad === null
+            ? "Fell below the rep floor at RIR 0 — add assistance at the next higher setting and rebuild."
+            : "Fell below the rep floor at RIR 0 — add assistance at your next known higher setting and rebuild."
+          : nextLoad === null
+            ? "Fell below the rep floor at RIR 0 — drop to the next lighter available resistance and rebuild."
+            : "Fell below the rep floor at RIR 0 — reduce to your next known lighter load and rebuild.",
     };
   }
 

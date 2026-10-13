@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { LoadType } from "../exercises/options";
 import {
   computeProgressionTarget,
   type LoggedSetForProgression,
@@ -7,7 +8,7 @@ import {
 } from "./progression";
 import { validateProgressionTarget } from "./progressionValidation";
 
-const PRESCRIPTION: ProgressionPrescription = { sets: 3, repMin: 8, repMax: 12, rirMin: 1, rirMax: 3 };
+const PRESCRIPTION: ProgressionPrescription = { sets: 3, repMin: 8, repMax: 12, rirMin: 1, rirMax: 3, restSeconds: 90, sessionRole: "accessory" };
 
 const valid = (overrides: Partial<ProgressionTarget> = {}): ProgressionTarget => ({
   targetLoadKg: 30,
@@ -19,7 +20,16 @@ const valid = (overrides: Partial<ProgressionTarget> = {}): ProgressionTarget =>
   ...overrides,
 });
 
-const context = (observedLoadsKg: number[] = [30]) => ({ currentPrescription: PRESCRIPTION, observedLoadsKg });
+const context = (
+  observedLoadsKg: number[] = [30],
+  extra: { loadType?: LoadType; recentLoadsKg?: (number | null)[] } = {},
+) => ({
+  currentPrescription: PRESCRIPTION,
+  observedLoadsKg,
+  loadType: "external" as LoadType,
+  recentLoadsKg: [30, 30, 30] as (number | null)[],
+  ...extra,
+});
 
 describe("validateProgressionTarget", () => {
   it("accepts a well-formed recommendation", () => {
@@ -36,6 +46,47 @@ describe("validateProgressionTarget", () => {
       const failures = validateProgressionTarget(valid({ reason, targetLoadKg: 30 }), context());
       expect(failures.join(" ")).toMatch(new RegExp(`${reason} must not carry a load`));
     }
+  });
+
+  it("accepts a held PRESCRIPTION_CHANGED load that was actually logged", () => {
+    expect(validateProgressionTarget(valid({ reason: "PRESCRIPTION_CHANGED", targetLoadKg: 30 }), context([30]))).toEqual([]);
+    expect(validateProgressionTarget(valid({ reason: "PRESCRIPTION_CHANGED", targetLoadKg: null }), context([]))).toEqual([]);
+  });
+
+  it("rejects a PRESCRIPTION_CHANGED load that is only an inferred step, and one with an instruction", () => {
+    // 32.5 is one observed step above 30 - legal for INCREASE_LOAD, never for a hold.
+    const stepped = validateProgressionTarget(
+      valid({ reason: "PRESCRIPTION_CHANGED", targetLoadKg: 32.5 }),
+      context([27.5, 30]),
+    );
+    expect(stepped.join(" ")).toMatch(/must hold a logged load/);
+    const withInstruction = validateProgressionTarget(
+      valid({ reason: "PRESCRIPTION_CHANGED", loadInstruction: "Add some." }),
+      context(),
+    );
+    expect(withInstruction.join(" ")).toMatch(/must not carry a load instruction/);
+  });
+
+  it("requires a numbered INCREASE_LOAD to move the kg the way the load type says", () => {
+    const observed = [25, 27.5, 30, 32.5];
+    // External: harder = more kg.
+    expect(validateProgressionTarget(valid({ reason: "INCREASE_LOAD", targetLoadKg: 32.5 }), context(observed))).toEqual([]);
+    expect(validateProgressionTarget(valid({ reason: "INCREASE_LOAD", targetLoadKg: 27.5 }), context(observed)).join(" ")).toMatch(
+      /must raise the kg/,
+    );
+    expect(validateProgressionTarget(valid({ reason: "REDUCE_LOAD", targetLoadKg: 32.5 }), context(observed)).join(" ")).toMatch(
+      /must lower the kg/,
+    );
+    // Assisted: harder = less assistance, so the same numbers are wrong the other way round.
+    const assisted = { loadType: "assisted" as const };
+    expect(validateProgressionTarget(valid({ reason: "INCREASE_LOAD", targetLoadKg: 27.5 }), context(observed, assisted))).toEqual([]);
+    expect(validateProgressionTarget(valid({ reason: "INCREASE_LOAD", targetLoadKg: 32.5 }), context(observed, assisted)).join(" ")).toMatch(
+      /must lower the kg/,
+    );
+    expect(validateProgressionTarget(valid({ reason: "REDUCE_LOAD", targetLoadKg: 32.5 }), context(observed, assisted))).toEqual([]);
+    expect(validateProgressionTarget(valid({ reason: "REDUCE_LOAD", targetLoadKg: 27.5 }), context(observed, assisted)).join(" ")).toMatch(
+      /must raise the kg/,
+    );
   });
 
   it("rejects a load instruction on a reason that never takes one", () => {
@@ -119,7 +170,9 @@ describe("independent oracle for computeProgressionTarget", () => {
   const previous: (ProgressionPrescription | null)[] = [
     PRESCRIPTION,
     null,
-    { sets: 2, repMin: 9, repMax: 15, rirMin: 1, rirMax: 2 },
+    { sets: 2, repMin: 9, repMax: 15, rirMin: 1, rirMax: 2, restSeconds: 90, sessionRole: "accessory" },
+    { ...PRESCRIPTION, restSeconds: 60 },
+    { ...PRESCRIPTION, sets: 4, sessionRole: "main" },
   ];
 
   it("never produces a recommendation the validator rejects, across a grid of histories", () => {
@@ -130,18 +183,25 @@ describe("independent oracle for computeProgressionTarget", () => {
           for (const flag of flags)
             for (const extra of extraObserved)
               for (const prev of previous)
+                for (const loadType of ["external", "assisted"] as const)
                 for (const elsewhere of [false, true]) {
                   const recentSets = loads.map((load, i) => set(load, reps[i % reps.length]!, rir, i === 1 ? flag : undefined));
                   const observedLoadsKg = [...loads.filter((l): l is number => l !== null), ...extra];
 
                   const target = computeProgressionTarget({
+                    loadType,
                     recentSets,
                     previousPrescription: prev,
                     currentPrescription: PRESCRIPTION,
                     observedLoadsKg,
                     hasHistoryInOtherContext: elsewhere,
                   });
-                  const failures = validateProgressionTarget(target, { currentPrescription: PRESCRIPTION, observedLoadsKg });
+                  const failures = validateProgressionTarget(target, {
+                    currentPrescription: PRESCRIPTION,
+                    observedLoadsKg,
+                    loadType,
+                    recentLoadsKg: recentSets.map((s) => s.loadKg),
+                  });
                   expect(failures, JSON.stringify({ recentSets, prev, observedLoadsKg, target })).toEqual([]);
                   checked++;
                 }
@@ -149,6 +209,7 @@ describe("independent oracle for computeProgressionTarget", () => {
     // Also the no-history case, in and out of another context.
     for (const elsewhere of [false, true]) {
       const target = computeProgressionTarget({
+        loadType: "external",
         recentSets: [],
         previousPrescription: null,
         currentPrescription: PRESCRIPTION,
@@ -157,6 +218,6 @@ describe("independent oracle for computeProgressionTarget", () => {
       });
       expect(validateProgressionTarget(target, context([]))).toEqual([]);
     }
-    expect(checked).toBeGreaterThan(1500);
+    expect(checked).toBeGreaterThan(3000);
   });
 });

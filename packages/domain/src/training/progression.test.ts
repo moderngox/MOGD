@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { LoadType } from "../exercises/options";
 import {
   computeProgressionTarget,
   resolveKnownNextLoad,
@@ -6,9 +7,10 @@ import {
   type ProgressionPrescription,
 } from "./progression";
 
-const PRESCRIPTION: ProgressionPrescription = { sets: 3, repMin: 8, repMax: 12, rirMin: 1, rirMax: 3 };
+const PRESCRIPTION: ProgressionPrescription = { sets: 3, repMin: 8, repMax: 12, rirMin: 1, rirMax: 3, restSeconds: 90, sessionRole: "accessory" };
 
 const BASE = {
+  loadType: "external" as LoadType,
   currentPrescription: PRESCRIPTION,
   previousPrescription: PRESCRIPTION as ProgressionPrescription | null,
   observedLoadsKg: [30],
@@ -153,7 +155,7 @@ describe("equipment context", () => {
 });
 
 describe("changed prescription context", () => {
-  const finisherThen = { sets: 2, repMin: 9, repMax: 15, rirMin: 1, rirMax: 2 };
+  const finisherThen = { sets: 2, repMin: 9, repMax: 15, rirMin: 1, rirMax: 2, restSeconds: 90, sessionRole: "accessory" };
 
   it("doesn't carry a load across a different rep range", () => {
     const target = computeProgressionTarget({
@@ -173,14 +175,14 @@ describe("changed prescription context", () => {
     expect(target.reason).toBe("CONTEXT_CHANGED");
   });
 
-  it("judges the last session against what was prescribed then, not today's set count", () => {
+  it("judges completeness against what was prescribed then, not today's set count", () => {
     const target = computeProgressionTarget({
       ...BASE,
       previousPrescription: { ...PRESCRIPTION, sets: 2 },
-      currentPrescription: { ...PRESCRIPTION, sets: 4 },
+      currentPrescription: { ...PRESCRIPTION, sets: 2 },
       recentSets: [set({ reps: 11 }), set({ reps: 11 })],
     });
-    // Same rep/RIR range, 2 of 2 prescribed sets done -> progresses, not "incomplete".
+    // 2 of 2 prescribed sets done -> progresses, not "incomplete".
     expect(target.reason).toBe("CONTINUE_REP_PROGRESSION");
   });
 
@@ -196,6 +198,130 @@ describe("changed prescription context", () => {
       recentSets: [set({ painFlag: true }), set({})],
     });
     expect(target.reason).toBe("REASSESS_DUE_TO_PAIN");
+  });
+});
+
+describe("changed sets, rest or role (same rep/RIR range)", () => {
+  const held = (previous: Partial<ProgressionPrescription> | null, current: Partial<ProgressionPrescription> = {}, sets = ceilingSets()) =>
+    computeProgressionTarget({
+      ...BASE,
+      previousPrescription: previous === null ? null : { ...PRESCRIPTION, ...previous },
+      currentPrescription: { ...PRESCRIPTION, ...current },
+      recentSets: sets,
+    });
+
+  it.each([
+    ["set count", { sets: 4 }],
+    ["rest", { restSeconds: 60 }],
+    ["role", { sessionRole: "main" }],
+  ])("holds the last load instead of increasing it when the %s changed", (_name, previous) => {
+    // These sets hit the rep ceiling at target RIR, which would be INCREASE_LOAD if nothing had changed.
+    expect(held({})).toMatchObject({ reason: "INCREASE_LOAD" });
+    expect(held(previous)).toMatchObject({
+      reason: "PRESCRIPTION_CHANGED",
+      targetLoadKg: 30,
+      loadInstruction: null,
+      targetRepMin: 8,
+      targetRepMax: 12,
+    });
+  });
+
+  it("also holds instead of reducing a load", () => {
+    const failing = [set({ reps: 5, rir: 0 }), set({ reps: 5, rir: 0 }), set({ reps: 5, rir: 0 })];
+    expect(held({}, {}, failing).reason).toBe("REDUCE_LOAD");
+    expect(held({ restSeconds: 60 }, {}, failing).reason).toBe("PRESCRIPTION_CHANGED");
+  });
+
+  it("holds without a load for bodyweight work", () => {
+    const bodyweight = [set({ loadKg: null }), set({ loadKg: null }), set({ loadKg: null })];
+    expect(held({ restSeconds: 60 }, {}, bodyweight)).toMatchObject({ reason: "PRESCRIPTION_CHANGED", targetLoadKg: null });
+  });
+
+  it("never counts an unknown role (null) as a change, on either side", () => {
+    expect(held({ sessionRole: null }).reason).toBe("INCREASE_LOAD");
+    expect(held({}, { sessionRole: null }).reason).toBe("INCREASE_LOAD");
+  });
+
+  it("treats legacy history (unknown prescription) as unchanged", () => {
+    expect(held(null).reason).toBe("INCREASE_LOAD");
+  });
+
+  it("is outranked by a changed rep or RIR range, which drops the load", () => {
+    expect(held({ repMax: 15, restSeconds: 60 })).toMatchObject({ reason: "CONTEXT_CHANGED", targetLoadKg: null });
+  });
+
+  it("is outranked by pain and by invalid technique", () => {
+    expect(held({ restSeconds: 60 }, {}, [set({ painFlag: true }), set({}), set({})]).reason).toBe("REASSESS_DUE_TO_PAIN");
+    expect(held({ restSeconds: 60 }, {}, [set({ techniqueValid: false }), set({}), set({})]).reason).toBe("HOLD_FOR_TECHNIQUE");
+  });
+
+  it("resumes normal progression once the new conditions have been performed", () => {
+    // Last session was done under the *current* rest/role/sets -> nothing differs now.
+    expect(held({ restSeconds: 60 }, { restSeconds: 60 }).reason).toBe("INCREASE_LOAD");
+  });
+});
+
+describe("assisted loads (more kg = easier)", () => {
+  const ASSISTED = { ...BASE, loadType: "assisted" as LoadType };
+  const at = (loadKg: number, reps: number, rir: number) => [1, 2, 3].map(() => set({ loadKg, reps, rir }));
+
+  it("progresses by lowering the assistance to the nearest lower setting already used", () => {
+    const target = computeProgressionTarget({ ...ASSISTED, observedLoadsKg: [30, 35, 40], recentSets: at(40, 12, 2) });
+    expect(target).toMatchObject({ reason: "INCREASE_LOAD", targetLoadKg: 35, loadInstruction: null });
+    expect(target.message).toMatch(/assistance/);
+  });
+
+  it("infers the lower setting from the smallest observed step when none is lower yet", () => {
+    const target = computeProgressionTarget({ ...ASSISTED, observedLoadsKg: [40, 45], recentSets: at(40, 12, 2) });
+    expect(target).toMatchObject({ reason: "INCREASE_LOAD", targetLoadKg: 35 });
+  });
+
+  it("asks for the next lower setting, never an invented kg, when the step is unknown", () => {
+    const target = computeProgressionTarget({ ...ASSISTED, observedLoadsKg: [40], recentSets: at(40, 12, 2) });
+    expect(target).toMatchObject({ reason: "INCREASE_LOAD", targetLoadKg: null });
+    expect(target.loadInstruction).toMatch(/Reduce the assistance/);
+  });
+
+  it("does not step to zero or below; it gives an instruction instead", () => {
+    const target = computeProgressionTarget({ ...ASSISTED, observedLoadsKg: [5, 10], recentSets: at(5, 12, 2) });
+    expect(target).toMatchObject({ reason: "INCREASE_LOAD", targetLoadKg: null });
+    expect(target.loadInstruction).toBeTruthy();
+  });
+
+  it("adds assistance (a higher kg) after failing at the rep floor", () => {
+    const target = computeProgressionTarget({ ...ASSISTED, observedLoadsKg: [35, 40, 45], recentSets: at(40, 5, 0) });
+    expect(target).toMatchObject({ reason: "REDUCE_LOAD", targetLoadKg: 45, loadInstruction: null });
+    expect(target.message).toMatch(/add assistance/i);
+  });
+
+  it("keeps the same load while still working through the rep range", () => {
+    const target = computeProgressionTarget({ ...ASSISTED, observedLoadsKg: [40], recentSets: at(40, 10, 2) });
+    expect(target).toMatchObject({ reason: "CONTINUE_REP_PROGRESSION", targetLoadKg: 40 });
+  });
+
+  it("breaks a working-load tie toward the harder setting for each load type", () => {
+    const tied = [set({ loadKg: 30, reps: 12 }), set({ loadKg: 30, reps: 12 }), set({ loadKg: 40, reps: 9 }), set({ loadKg: 40, reps: 9 })];
+    // Assisted: 30 kg of help is harder than 40, so those two sets are judged (and they hit the ceiling).
+    const assisted = computeProgressionTarget({ ...ASSISTED, observedLoadsKg: [30, 40], recentSets: tied, currentPrescription: { ...PRESCRIPTION, sets: 2 }, previousPrescription: { ...PRESCRIPTION, sets: 2 } });
+    expect(assisted.reason).toBe("INCREASE_LOAD");
+    // External: 40 kg is the harder one; its sets are below the ceiling.
+    const external = computeProgressionTarget({ ...BASE, observedLoadsKg: [30, 40], recentSets: tied, currentPrescription: { ...PRESCRIPTION, sets: 2 }, previousPrescription: { ...PRESCRIPTION, sets: 2 } });
+    expect(external.reason).toBe("CONTINUE_REP_PROGRESSION");
+    expect(external.targetLoadKg).toBe(40);
+  });
+
+  it("treats fully removed assistance as unassisted bodyweight work", () => {
+    const unassisted = [1, 2, 3].map(() => set({ loadKg: null, reps: 12, rir: 2 }));
+    const target = computeProgressionTarget({ ...ASSISTED, observedLoadsKg: [40, 35], recentSets: unassisted });
+    expect(target).toMatchObject({ reason: "INCREASE_LOAD", targetLoadKg: null });
+    expect(target.loadInstruction).toMatch(/external load|harder variation/);
+  });
+
+  it("behaves exactly as before for external loads", () => {
+    expect(computeProgressionTarget({ ...BASE, observedLoadsKg: [30, 35, 40], recentSets: at(35, 12, 2) })).toMatchObject({
+      reason: "INCREASE_LOAD",
+      targetLoadKg: 40,
+    });
   });
 });
 
@@ -288,8 +414,8 @@ describe("resolveKnownNextLoad", () => {
 });
 
 describe("canonical Cable Lateral Raise case (spec 05)", () => {
-  const profile: ProgressionPrescription = { sets: 3, repMin: 12, repMax: 15, rirMin: 1, rirMax: 3 };
-  const base = { currentPrescription: profile, previousPrescription: profile, hasHistoryInOtherContext: false };
+  const profile: ProgressionPrescription = { sets: 3, repMin: 12, repMax: 15, rirMin: 1, rirMax: 3, restSeconds: 90, sessionRole: "accessory" };
+  const base = { loadType: "external" as const, currentPrescription: profile, previousPrescription: profile, hasHistoryInOtherContext: false };
   const history = [
     set({ loadKg: 7.5, reps: 15, rir: 2 }),
     set({ loadKg: 7.5, reps: 15, rir: 2 }),

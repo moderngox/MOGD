@@ -81,6 +81,14 @@ export type SessionRole = (typeof SESSION_ROLE_OPTIONS)[number];
  * lists (not a hardcoded literal) so the schema and admin UI are ready for a
  * second value later without pretending one exists today.
  */
+/**
+ * What a logged load means for an exercise: weight added ("external", more is
+ * harder) or weight taken away ("assisted", e.g. an assisted pull-up machine,
+ * more is easier). Progression moves an assisted load down, not up.
+ */
+export const LOAD_TYPE_OPTIONS = ["external", "assisted"] as const;
+export type LoadType = (typeof LOAD_TYPE_OPTIONS)[number];
+
 export const PRESCRIPTION_TYPE_OPTIONS = ["rir"] as const;
 export type PrescriptionType = (typeof PRESCRIPTION_TYPE_OPTIONS)[number];
 

@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { schema, type Database } from "@mogd/db";
 import { checkEligibility } from "../safety/eligibility";
 import { assertOwnsPrivatePhotoKey } from "../users/photoOwnership";
+import { assertKnownRestrictionKeys } from "../safety/restrictions";
 import { assessmentSubmissionSchema, type AssessmentSubmission } from "./schemas";
 
 export interface SubmitAssessmentResult {
@@ -28,6 +29,9 @@ export async function submitAssessment(
   for (const photo of input.photos) {
     assertOwnsPrivatePhotoKey(userId, photo.objectKey);
   }
+
+  // Unknown keys are rejected, not dropped: a silently ignored restriction would look honoured but not be.
+  await assertKnownRestrictionKeys(db, input.restrictionKeys ?? []);
 
   const eligibility = checkEligibility({ sex: input.sex, age: input.age });
   if (!eligibility.eligible) {
@@ -89,6 +93,7 @@ export async function submitAssessment(
         trainingHistoryNotes: input.trainingHistoryNotes,
         limitations: input.limitations,
         injuryRestrictions: input.injuryRestrictions,
+        restrictionKeys: input.restrictionKeys ?? [],
         sessionsPerWeek: input.sessionsPerWeek,
         sessionDurationMinutes: input.sessionDurationMinutes,
         trainingContext: input.trainingContext,
@@ -104,6 +109,7 @@ export async function submitAssessment(
           trainingHistoryNotes: input.trainingHistoryNotes,
           limitations: input.limitations,
           injuryRestrictions: input.injuryRestrictions,
+          restrictionKeys: input.restrictionKeys ?? [],
           sessionsPerWeek: input.sessionsPerWeek,
           sessionDurationMinutes: input.sessionDurationMinutes,
           trainingContext: input.trainingContext,

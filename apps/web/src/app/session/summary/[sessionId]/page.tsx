@@ -32,6 +32,7 @@ export default async function SessionSummaryPage({
     performances.push({
       id: performance.id,
       name: exercise?.name ?? "Exercise",
+      loadType: exercise?.loadType ?? "external",
       sets: performance.sets,
       repMin: performance.repMin,
       repMax: performance.repMax,

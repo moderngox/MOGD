@@ -149,7 +149,15 @@ export async function getOrStartPerformance(
       db,
       userId,
       exerciseId,
-      { sets: slot.sets, repMin: slot.repMin, repMax: slot.repMax, rirMin: slot.rirMin, rirMax: slot.rirMax },
+      {
+        sets: slot.sets,
+        repMin: slot.repMin,
+        repMax: slot.repMax,
+        rirMin: slot.rirMin,
+        rirMax: slot.rirMax,
+        restSeconds: slot.restSeconds,
+        sessionRole: slot.sessionRole,
+      },
       { locationId: session.trainingLocationId, excludeSessionId: session.id },
     );
     await db

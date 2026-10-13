@@ -56,7 +56,7 @@ describe("an invalid recommendation never reaches the athlete or the snapshot", 
 
   it("getProgressionTargetForExercise throws instead of returning an invented load", async () => {
     await expect(
-      getProgressionTargetForExercise(db, userId, exerciseId, { sets: 3, repMin: 6, repMax: 10, rirMin: 1, rirMax: 3 }, { locationId: null }),
+      getProgressionTargetForExercise(db, userId, exerciseId, { sets: 3, repMin: 6, repMax: 10, rirMin: 1, rirMax: 3, restSeconds: 60, sessionRole: "accessory" }, { locationId: null }),
     ).rejects.toThrow(InvalidRecommendationError);
   });
 

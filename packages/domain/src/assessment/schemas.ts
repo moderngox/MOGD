@@ -45,6 +45,14 @@ export const trainingHistoryStepSchema = z.object({
   trainingHistoryNotes: boundedNote.optional(),
   limitations: boundedNote.optional(),
   injuryRestrictions: boundedNote.optional(),
+  // Keys of admin-defined restriction categories; the only restriction input that filters exercises
+  // (the notes above are stored and shown back, never interpreted). Omitted = none reported. Checked
+  // against the taxonomy in submitAssessment.
+  restrictionKeys: z
+    .array(z.string().trim().min(1).max(48))
+    .max(30)
+    .refine((keys) => new Set(keys).size === keys.length, "Restrictions must be unique")
+    .optional(),
 });
 
 export const availabilityStepSchema = z.object({

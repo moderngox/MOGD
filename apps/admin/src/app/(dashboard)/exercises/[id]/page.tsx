@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDb } from "@mogd/db";
-import { exercises } from "@mogd/domain";
+import { exercises, safety } from "@mogd/domain";
 import { Badge, Button } from "@mogd/ui";
 import { ExerciseForm } from "../ExerciseForm";
 import { RelationshipsSection } from "./RelationshipsSection";
@@ -17,10 +17,11 @@ export default async function EditExercisePage({
   const exercise = await exercises.getExerciseById(db, id);
   if (!exercise) notFound();
 
-  const [relationships, allExercises, programmingProfiles] = await Promise.all([
+  const [relationships, allExercises, programmingProfiles, restrictionCategories] = await Promise.all([
     exercises.getExerciseRelationships(db, id),
     exercises.listExercises(db),
     exercises.listProgrammingProfiles(db, id),
+    safety.listRestrictionCategories(db),
   ]);
 
   return (
@@ -38,6 +39,7 @@ export default async function EditExercisePage({
       </div>
       <ExerciseForm
         exerciseId={exercise.id}
+        restrictionCategories={restrictionCategories.map((c) => ({ key: c.key, label: c.label }))}
         initial={{
           canonicalId: exercise.canonicalId,
           name: exercise.name,
@@ -50,6 +52,7 @@ export default async function EditExercisePage({
           strengthScore: exercise.strengthScore ?? undefined,
           fatigueScore: exercise.fatigueScore ?? undefined,
           stabilityDemand: exercise.stabilityDemand ?? undefined,
+          loadType: exercise.loadType,
           contraindicationTags: exercise.contraindicationTags,
           instructions: exercise.instructions ?? undefined,
           isActive: exercise.isActive,

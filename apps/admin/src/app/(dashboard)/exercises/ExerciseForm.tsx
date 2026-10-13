@@ -1,13 +1,20 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ZodError } from "zod";
 import { Button, Card, Checkbox, Input, Select, Textarea } from "@mogd/ui";
 import { exercises, physique } from "@mogd/domain";
 import { createExerciseAction, updateExerciseAction } from "./actions";
 
-const { MOVEMENT_PATTERN_OPTIONS, EXERCISE_DIFFICULTY_OPTIONS, EQUIPMENT_OPTIONS, SESSION_ROLE_OPTIONS } = exercises;
+const { MOVEMENT_PATTERN_OPTIONS, EXERCISE_DIFFICULTY_OPTIONS, EQUIPMENT_OPTIONS, SESSION_ROLE_OPTIONS, LOAD_TYPE_OPTIONS } =
+  exercises;
+
+const LOAD_TYPE_LABELS: Record<string, string> = {
+  external: "Added weight (more kg = harder)",
+  assisted: "Assisted (more kg of help = easier)",
+};
 const { CANONICAL_MUSCLE_GROUPS } = physique;
 
 function label(value: string): string {
@@ -26,6 +33,7 @@ export interface ExerciseFormValue {
   strengthScore?: number;
   fatigueScore?: number;
   stabilityDemand?: number;
+  loadType: string;
   contraindicationTags: string[];
   instructions?: string;
   isActive: boolean;
@@ -41,22 +49,29 @@ const EMPTY: ExerciseFormValue = {
   primaryMuscles: [],
   secondaryMuscles: [],
   equipment: [],
+  loadType: "external",
   contraindicationTags: [],
   isActive: true,
   // Eligibility is explicit: a new exercise starts as accessory-eligible.
   allowedSessionRoles: ["accessory"],
 };
 
+export interface RestrictionCategoryOption {
+  key: string;
+  label: string;
+}
+
 export function ExerciseForm({
   exerciseId,
   initial,
+  restrictionCategories,
 }: {
   exerciseId?: string;
   initial?: ExerciseFormValue;
+  restrictionCategories: RestrictionCategoryOption[];
 }) {
   const router = useRouter();
   const [form, setForm] = useState<ExerciseFormValue>(initial ?? EMPTY);
-  const [tagsText, setTagsText] = useState(initial?.contraindicationTags.join(", ") ?? "");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -70,6 +85,15 @@ export function ExerciseForm({
       field,
       current.includes(value) ? current.filter((v) => v !== value) : [...current, value],
     );
+  }
+
+  const categoryKeys = new Set(restrictionCategories.map((c) => c.key));
+  /** Tags saved before the taxonomy existed (or whose category is gone): they match nobody, so they must be removed, not carried. */
+  const unrecognisedTags = form.contraindicationTags.filter((tag) => !categoryKeys.has(tag));
+
+  function toggleRestriction(value: string) {
+    const current = form.contraindicationTags;
+    set("contraindicationTags", current.includes(value) ? current.filter((v) => v !== value) : [...current, value]);
   }
 
   function toggleEquipment(value: string) {
@@ -97,14 +121,14 @@ export function ExerciseForm({
 
   async function save() {
     setError(null);
-    const contraindicationTags = tagsText
-      .split(",")
-      .map((tag) => tag.trim())
-      .filter(Boolean);
+    if (unrecognisedTags.length > 0) {
+      setError(`Remove the unrecognised restriction tags before saving: ${unrecognisedTags.join(", ")}.`);
+      return;
+    }
 
     setSaving(true);
     try {
-      const payload = { ...form, contraindicationTags };
+      const payload = { ...form };
       if (exerciseId) {
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { canonicalId, ...updatePayload } = payload;
@@ -232,6 +256,21 @@ export function ExerciseForm({
       </Card>
 
       <Card title="Programming">
+        <div className="flex flex-col gap-1 pb-3">
+          <label className="text-xs font-semibold uppercase tracking-wide text-fg-secondary" htmlFor="loadType">
+            What a logged load means
+          </label>
+          <Select id="loadType" value={form.loadType} onChange={(e) => set("loadType", e.target.value)}>
+            {LOAD_TYPE_OPTIONS.map((type) => (
+              <option key={type} value={type}>
+                {LOAD_TYPE_LABELS[type]}
+              </option>
+            ))}
+          </Select>
+          <p className="text-xs text-fg-secondary">
+            Assisted exercises (e.g. an assisted pull-up machine) progress by lowering the assistance.
+          </p>
+        </div>
         <div className="grid grid-cols-2 gap-3">
           <Input
             type="number"
@@ -301,11 +340,50 @@ export function ExerciseForm({
       </Card>
 
       <Card title="Safety">
-        <Input
-          placeholder="Contraindication tags, comma separated (e.g. knee_pain, shoulder_impingement)"
-          value={tagsText}
-          onChange={(e) => setTagsText(e.target.value)}
-        />
+        <p className="text-xs text-fg-secondary">
+          Tick every restriction category this exercise is unsuitable for. An athlete who reports a ticked category is
+          never given this exercise.
+        </p>
+        {restrictionCategories.length === 0 && unrecognisedTags.length === 0 ? (
+          <p className="text-sm text-fg-secondary">
+            No restriction categories exist yet.{" "}
+            <Link href="/exercises/restrictions" className="text-accent hover:underline">
+              Add reviewed categories
+            </Link>{" "}
+            to use this.
+          </p>
+        ) : (
+          <div className="flex flex-wrap gap-x-4 gap-y-2">
+            {restrictionCategories.map((category) => (
+              <Checkbox
+                key={category.key}
+                id={`restriction-${category.key}`}
+                label={category.label}
+                checked={form.contraindicationTags.includes(category.key)}
+                onChange={() => toggleRestriction(category.key)}
+              />
+            ))}
+          </div>
+        )}
+        {unrecognisedTags.length > 0 && (
+          <div className="flex flex-col gap-2 rounded-md border border-status-warning/40 p-3">
+            <p className="text-xs text-status-warning">
+              These tags are not restriction categories, so they match no athlete. Untick to remove them; saving is blocked
+              until they are gone.
+            </p>
+            <div className="flex flex-wrap gap-x-4 gap-y-2">
+              {unrecognisedTags.map((tag) => (
+                <Checkbox
+                  key={tag}
+                  id={`restriction-legacy-${tag}`}
+                  label={tag}
+                  checked
+                  onChange={() => toggleRestriction(tag)}
+                />
+              ))}
+            </div>
+          </div>
+        )}
       </Card>
 
       <Card title="Instructions">

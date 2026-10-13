@@ -217,7 +217,13 @@ interface Exercise {
   fatigueScore?: number;
   stabilityDemand?: number;
 
+  // Keys of restriction categories (see "Restriction taxonomy" below), never free text.
   contraindicationTags: string[];
+
+  // What a logged load means: "external" (added weight, more = harder) or
+  // "assisted" (weight taken off, more = easier). Bodyweight work is not a type:
+  // it is an exercise whose sets carry no load.
+  loadType: "external" | "assisted";
 
   instructions?: string;
 
@@ -227,6 +233,8 @@ interface Exercise {
   updatedAt: Date;
 }
 ```
+
+**Restriction taxonomy.** `restriction_category` (`key`, `label`) is the one vocabulary joining what an athlete reports to what an exercise is unsuitable for. It is admin-managed and ships **empty**: `docs/AI_AND_SAFETY.md` says clinical categories must not be invented, so nothing is filtered until reviewed categories are added (admin: Exercises → Restrictions). Keys are immutable and are what `exercise.contraindicationTags` and `training_profile.restrictionKeys` store. Both write boundaries reject a key that is not a category rather than dropping it, a category in use cannot be deleted, and the candidate pool excludes any exercise whose tags intersect the athlete's keys; `validateProgram` re-checks the same thing independently. The athlete's free-text limitation and injury notes are stored and shown back but never interpreted. Tags saved before the taxonomy existed match nobody and must be removed in the admin form before that exercise can be saved again.
 
 Only add programming metadata that the engine genuinely uses. Sets/reps/RIR/rest are deliberately not on the exercise itself — they live on a separate, trainee-level `ExerciseProgrammingProfile` (one row per exercise per beginner/intermediate/advanced), since exercise difficulty and trainee level are independent dimensions:
 
@@ -426,7 +434,7 @@ Persist:
 
 Sets belong to a dated **workout occurrence**, not to the recurring program slot: `workout_session` (one physical workout; its `workoutId` is set null if the slot is regenerated away) → `workout_exercise_performance` (one exercise within it, holding a snapshot of the prescription and the recommendation the athlete was shown) → set rows in `exercise_log`. The first logged set starts or resumes the open occurrence (one per slot, enforced by a partial unique index); logging a set is an upsert on `(performance, setNumber)` so retries and corrections never duplicate; finishing confirms the workout and opens a summary where any set can still be corrected. Regenerating the program abandons an open occurrence but keeps its snapshots and sets.
 
-Previous exercise performance should be available to future sessions, read from the most recent *other* occurrence (never the one in progress). History is also scoped to an **equipment context**: each occurrence carries an optional named training location (`training_location`), fixed when it starts, and a load is never carried across locations because two machines can show the same stack weight yet differ. The same holds across a changed prescription — last session is judged against the rep/RIR range it was actually prescribed, and if that differs from today's the engine reports `CONTEXT_CHANGED` with no kg instead of reusing the load. Sets at different loads within a session are reduced to the *working* load (most-used, ties to heaviest), and bodyweight work progresses by reps then asks for added load or a harder variation, never an invented kg. Progression evaluates every set logged in that occurrence, not just the latest set — a rep ceiling reached at RIR 0 is not the same signal as reaching it within the prescribed RIR range, and a pain or invalid-technique flag on any set blocks an automatic load increase regardless of reps achieved.
+Previous exercise performance should be available to future sessions, read from the most recent *other* occurrence (never the one in progress). History is also scoped to an **equipment context**: each occurrence carries an optional named training location (`training_location`), fixed when it starts, and a load is never carried across locations because two machines can show the same stack weight yet differ. The same holds across a changed prescription — last session is judged against the rep/RIR range it was actually prescribed, and if that differs from today's the engine reports `CONTEXT_CHANGED` with no kg instead of reusing the load. When only the set count, rest or assigned role differs (same rep/RIR range) the load is still a fair starting point but its evidence was gathered under other conditions, so the engine reports `PRESCRIPTION_CHANGED`: repeat the last working load, no increase or reduction that session. A role-rules edit therefore costs each affected athlete one no-increase session of that exercise, which is the accepted price of not resetting everyone's load. Sets at different loads within a session are reduced to the *working* load (most-used, ties to the harder one), an **assisted** exercise (`loadType: "assisted"`) keeps the same reason codes but moves the number the other way — `INCREASE_LOAD` lowers the assistance, `REDUCE_LOAD` adds it, and a step that would reach zero becomes an instruction — and bodyweight work progresses by reps then asks for added load or a harder variation, never an invented kg. Progression evaluates every set logged in that occurrence, not just the latest set — a rep ceiling reached at RIR 0 is not the same signal as reaching it within the prescribed RIR range, and a pain or invalid-technique flag on any set blocks an automatic load increase regardless of reps achieved.
 
 ---
 

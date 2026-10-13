@@ -4,6 +4,7 @@ import { type Database } from "@mogd/db";
 import { createExercise } from "./exerciseCatalog";
 import { createDraftAsset, approveAsset } from "./assetService";
 import { getCatalogStats } from "./catalogStats";
+import { upsertProgrammingProfile } from "./programmingProfiles";
 import type { CreateExerciseInput } from "./schemas";
 
 const base: CreateExerciseInput = {
@@ -49,5 +50,26 @@ describe("getCatalogStats", () => {
     // Only romanian_deadlift is active without a published video —
     // old_move is inactive and excluded from this count entirely.
     expect(stats.missingVideoCount).toBe(1);
+  });
+
+  it("counts exercises that still have any level on the unreviewed default profile", async () => {
+    const reviewed = await createExercise(db, base);
+    await createExercise(db, { ...base, canonicalId: "romanian_deadlift" });
+    expect((await getCatalogStats(db)).inheritedProfileCount).toBe(2);
+
+    for (const level of ["beginner", "intermediate", "advanced"] as const) {
+      await upsertProgrammingProfile(db, reviewed!.id, level, {
+        enabled: true,
+        setsMin: 3,
+        setsMax: 4,
+        repsMin: 8,
+        repsMax: 12,
+        rirMin: 1,
+        rirMax: 3,
+        restSecondsMin: 60,
+        restSecondsMax: 90,
+      });
+    }
+    expect((await getCatalogStats(db)).inheritedProfileCount).toBe(1);
   });
 });

@@ -109,6 +109,7 @@ describe("getAssessmentFormState", () => {
       trainingHistoryNotes: undefined,
       limitations: undefined,
       injuryRestrictions: undefined,
+      restrictionKeys: [],
       sessionsPerWeek: 3,
       sessionDurationMinutes: 45,
       trainingContext: ["home"],

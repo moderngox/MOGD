@@ -50,6 +50,17 @@ export default async function AdminDashboardPage() {
               {stats.missingVideoCount}
             </span>
           </div>
+          <div className="flex items-baseline justify-between">
+            <span className="text-sm text-fg-secondary-alt">On unreviewed default profiles</span>
+            <Link
+              href="/exercises?profiles=default"
+              className={`text-sm font-semibold tabular-nums hover:text-accent ${
+                stats.inheritedProfileCount > 0 ? "text-status-caution" : "text-fg"
+              }`}
+            >
+              {stats.inheritedProfileCount}
+            </Link>
+          </div>
         </Card>
 
         <Card title="AI health" eyebrow={<Link href="/ai-runs" className="hover:text-accent">View all →</Link>}>

@@ -46,6 +46,7 @@ describe("validateProgram", () => {
       sessionDurationMinutes: 15,
       equipment: ["dumbbells"],
       experienceLevel: "intermediate",
+      restrictionKeys: [],
       roleRulesRevisionId: null,
       workouts: [
         {

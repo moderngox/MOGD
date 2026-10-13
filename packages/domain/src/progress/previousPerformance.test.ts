@@ -15,7 +15,7 @@ import {
 } from "./previousPerformance";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const PRESCRIPTION = { sets: 3, repMin: 12, repMax: 15, rirMin: 1, rirMax: 3 };
+const PRESCRIPTION = { sets: 3, repMin: 12, repMax: 15, rirMin: 1, rirMax: 3, restSeconds: 60, sessionRole: "accessory" };
 const NO_PLACE = { locationId: null };
 
 describe("session-based history", () => {
@@ -103,7 +103,7 @@ describe("session-based history", () => {
   it("returns the prescription that occurrence was performed under", async () => {
     await performSession([set(1)], 2);
     const { prescription } = await getRecentSessionPerformance(db, userId, exerciseId, NO_PLACE);
-    expect(prescription).toEqual({ sets: 3, repMin: 12, repMax: 15, rirMin: 1, rirMax: 3 });
+    expect(prescription).toEqual({ sets: 3, repMin: 12, repMax: 15, rirMin: 1, rirMax: 3, restSeconds: 60, sessionRole: "accessory" });
   });
 
   it("reports an unknown prescription for legacy history", async () => {
@@ -156,10 +156,41 @@ describe("session-based history", () => {
       db,
       userId,
       exerciseId,
-      { sets: 3, repMin: 6, repMax: 10, rirMin: 1, rirMax: 3 },
+      { sets: 3, repMin: 6, repMax: 10, rirMin: 1, rirMax: 3, restSeconds: 60, sessionRole: "accessory" },
       NO_PLACE,
     );
     expect(target).toMatchObject({ reason: "CONTEXT_CHANGED", targetLoadKg: null, targetRepMin: 6, targetRepMax: 10 });
+  });
+
+  it("holds the load, rather than progressing, when only the rest, set count or role changed since the snapshot", async () => {
+    await performSession(
+      [1, 2, 3].map((n) => set(n, { loadKg: 7.5, reps: 15, rir: 2 })),
+      2,
+    );
+    // Unchanged conditions would have said INCREASE_LOAD (ceiling reps within RIR).
+    expect((await getProgressionTargetForExercise(db, userId, exerciseId, PRESCRIPTION, NO_PLACE)).reason).toBe(
+      "INCREASE_LOAD",
+    );
+
+    for (const changed of [{ restSeconds: 90 }, { sets: 4 }, { sessionRole: "finisher" }]) {
+      const target = await getProgressionTargetForExercise(db, userId, exerciseId, { ...PRESCRIPTION, ...changed }, NO_PLACE);
+      expect(target).toMatchObject({ reason: "PRESCRIPTION_CHANGED", targetLoadKg: 7.5, loadInstruction: null });
+    }
+  });
+
+  it("progresses an assisted exercise by lowering the logged assistance, using its stored load type", async () => {
+    await db.update(schema.exercises).set({ loadType: "assisted" }).where(eq(schema.exercises.id, exerciseId));
+    await performSession([set(1, { loadKg: 40, reps: 8 })], 3);
+    await performSession([1, 2, 3].map((n) => set(n, { loadKg: 35, reps: 15, rir: 2 })), 1);
+
+    // Ceiling at RIR 2 on 35 kg of assistance: harder is *less* help, and 40 -> 35 shows the step is 5 kg.
+    const target = await getProgressionTargetForExercise(db, userId, exerciseId, PRESCRIPTION, NO_PLACE);
+    expect(target).toMatchObject({ reason: "INCREASE_LOAD", targetLoadKg: 30, loadInstruction: null });
+
+    // The same history on an external exercise moves the other way.
+    await db.update(schema.exercises).set({ loadType: "external" }).where(eq(schema.exercises.id, exerciseId));
+    const external = await getProgressionTargetForExercise(db, userId, exerciseId, PRESCRIPTION, NO_PLACE);
+    expect(external).toMatchObject({ reason: "INCREASE_LOAD", targetLoadKg: 40 });
   });
 
   describe("increment inferred from logged history", () => {

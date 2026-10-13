@@ -24,6 +24,7 @@ export {
 export { getCatalogStats, type CatalogStats } from "./catalogStats";
 export {
   createDefaultProgrammingProfiles,
+  listInheritedDefaultLevels,
   listProgrammingProfiles,
   listProgrammingProfilesForExercises,
   resolveApplicableProfile,

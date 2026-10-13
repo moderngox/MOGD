@@ -7,6 +7,7 @@ import {
   ASSET_TYPE_OPTIONS,
   RELATIONSHIP_ACTION_OPTIONS,
   SESSION_ROLE_OPTIONS,
+  LOAD_TYPE_OPTIONS,
 } from "./options";
 
 /**
@@ -35,9 +36,11 @@ const exerciseFields = z.object({
   strengthScore: z.coerce.number().min(0).max(10).optional(),
   fatigueScore: z.coerce.number().min(0).max(10).optional(),
   stabilityDemand: z.coerce.number().min(0).max(10).optional(),
-  // Free-form for now — no reviewed contraindication taxonomy exists yet
-  // (see docs/AI_AND_SAFETY.md caution against inventing unapproved
-  // clinical categories). Admin enters plain tags.
+  // Omitted = the stored default on create ("external") and "unchanged" on update; never overwritten silently.
+  loadType: z.enum(LOAD_TYPE_OPTIONS).optional(),
+  // Keys of restriction categories (safety/restrictions.ts), checked against the taxonomy at the
+  // write boundary in exerciseCatalog.ts. The taxonomy is admin-managed and starts empty, so no
+  // clinical category is invented here (docs/AI_AND_SAFETY.md).
   contraindicationTags: z.array(z.string().trim().max(60)).default([]),
   instructions: boundedText.optional(),
   isActive: z.coerce.boolean().default(true),

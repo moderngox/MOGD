@@ -5,6 +5,7 @@ import type { ExerciseDifficulty } from "../exercises/options";
 import type { ProgrammingProfile } from "../exercises/programmingProfiles";
 import { listProgrammingProfilesForExercises, resolveApplicableProfile } from "../exercises/programmingProfiles";
 import type { CanonicalMuscleGroup } from "../physique/muscles";
+import { conflictingRestrictions } from "../safety/restrictions";
 import type { SessionLabel } from "./splitTemplates";
 import { SESSION_MUSCLE_MAP } from "./splitTemplates";
 
@@ -38,11 +39,12 @@ export interface EligibleExercise extends CatalogExercise {
  * 04: "no history" prescribes reps/RIR only, but *something* must define
  * that rep/RIR range — an exercise with every profile disabled has nothing
  * to prescribe and is excluded, same as failing any other hard gate).
- * Note: this does NOT check the user's free-text injury/limitation notes
- * against exercise contraindication tags — there is no reviewed structured
- * taxonomy connecting the two (see docs/domain/safety's eligibility.ts for
- * the same honesty principle: don't fabricate a matching heuristic that
- * looks safe but isn't backed by real structured data).
+ * Restrictions are matched on structured keys only: an exercise whose
+ * contraindicationTags include any category the athlete reported is excluded
+ * (safety/restrictions.ts). The athlete's free-text limitation notes are
+ * stored for display but never interpreted - no heuristic that looks safe
+ * without reviewed structured data behind it. With an empty taxonomy no
+ * exercise carries a tag, so nothing is excluded here.
  */
 export async function getExerciseCandidates(
   db: Database,
@@ -50,6 +52,8 @@ export async function getExerciseCandidates(
     sessionLabel: SessionLabel;
     experienceLevel: ExperienceLevel;
     equipment: Equipment[];
+    /** Required, so a caller can't forget it: pass [] only for an athlete who reported none. */
+    restrictionKeys: string[];
   },
 ): Promise<EligibleExercise[]> {
   const allActive = await db
@@ -64,6 +68,8 @@ export async function getExerciseCandidates(
   const gated = allActive.filter((exercise) => {
     // No allowed session role = no legal role in any session (eligibility must be explicit).
     if (exercise.allowedSessionRoles.length === 0) return false;
+
+    if (conflictingRestrictions(exercise.contraindicationTags, input.restrictionKeys).length > 0) return false;
 
     if (!allowedDifficulty.has(exercise.difficulty as ExerciseDifficulty)) return false;
 

@@ -32,6 +32,7 @@ function mockExercise(overrides: Partial<CatalogExercise> = {}): CatalogExercise
     strengthScore: null,
     fatigueScore: null,
     stabilityDemand: null,
+    loadType: "external",
     contraindicationTags: [],
     instructions: null,
     isActive: true,

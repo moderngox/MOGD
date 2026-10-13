@@ -10,9 +10,12 @@ export interface ExerciseRow {
   name: string;
   difficulty: string;
   isActive: boolean;
+  /** Trainee levels still on the generic seeded profile; empty = every level reviewed. */
+  inheritedLevels: string[];
 }
 
 type StatusFilter = "all" | "active" | "inactive";
+type ProfilesFilter = "all" | "default";
 
 const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
   { value: "all", label: "All" },
@@ -25,19 +28,27 @@ function formatLabel(value: string) {
 }
 
 /** Search-by-name/canonicalId + active/inactive filter chips over the already-fetched catalog. */
-export function ExercisesTable({ rows }: { rows: ExerciseRow[] }) {
+export function ExercisesTable({
+  rows,
+  initialProfiles = "all",
+}: {
+  rows: ExerciseRow[];
+  initialProfiles?: ProfilesFilter;
+}) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<StatusFilter>("all");
+  const [profiles, setProfiles] = useState<ProfilesFilter>(initialProfiles);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return rows.filter((row) => {
       if (status === "active" && !row.isActive) return false;
       if (status === "inactive" && row.isActive) return false;
+      if (profiles === "default" && row.inheritedLevels.length === 0) return false;
       if (!q) return true;
       return row.name.toLowerCase().includes(q) || row.canonicalId.toLowerCase().includes(q);
     });
-  }, [rows, query, status]);
+  }, [rows, query, status, profiles]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -69,6 +80,19 @@ export function ExercisesTable({ rows }: { rows: ExerciseRow[] }) {
             {f.label}
           </button>
         ))}
+        <button
+          type="button"
+          onClick={() => setProfiles(profiles === "default" ? "all" : "default")}
+          aria-pressed={profiles === "default"}
+          className={cn(
+            "rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-wide transition-colors",
+            profiles === "default"
+              ? "border-accent bg-accent text-bg"
+              : "border-border text-fg-secondary hover:border-border-strong hover:text-fg-secondary-alt",
+          )}
+        >
+          Default profiles
+        </button>
       </div>
 
       {filtered.length === 0 ? (
@@ -84,6 +108,7 @@ export function ExercisesTable({ rows }: { rows: ExerciseRow[] }) {
                 <th className="px-4 py-2.5 font-semibold">canonicalId</th>
                 <th className="px-4 py-2.5 font-semibold">Difficulty</th>
                 <th className="px-4 py-2.5 font-semibold">Status</th>
+                <th className="px-4 py-2.5 font-semibold">Profiles</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -100,6 +125,15 @@ export function ExercisesTable({ rows }: { rows: ExerciseRow[] }) {
                     <Badge variant={exercise.isActive ? "positive" : "neutral"}>
                       {exercise.isActive ? "Active" : "Inactive"}
                     </Badge>
+                  </td>
+                  <td className="px-4 py-2.5">
+                    {exercise.inheritedLevels.length === 0 ? (
+                      <Badge variant="positive">Reviewed</Badge>
+                    ) : (
+                      <span title={`Unreviewed default: ${exercise.inheritedLevels.join(", ")}`}>
+                        <Badge variant="caution">Default ({exercise.inheritedLevels.length}/3)</Badge>
+                      </span>
+                    )}
                   </td>
                 </tr>
               ))}

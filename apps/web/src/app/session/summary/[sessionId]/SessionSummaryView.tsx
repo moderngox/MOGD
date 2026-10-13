@@ -23,10 +23,11 @@ export interface SummaryPerformanceView {
   repMax: number;
   rirMin: number;
   rirMax: number;
+  loadType: "external" | "assisted";
   loggedSets: SummarySetView[];
 }
 
-function SetRow({ set }: { set: SummarySetView }) {
+function SetRow({ set, loadType }: { set: SummarySetView; loadType: "external" | "assisted" }) {
   const [load, setLoad] = useState(set.loadKg === null ? "" : String(set.loadKg));
   const [reps, setReps] = useState(String(set.reps));
   const [rir, setRir] = useState(set.rir === null ? "" : String(set.rir));
@@ -56,7 +57,7 @@ function SetRow({ set }: { set: SummarySetView }) {
     <div className="flex flex-col gap-2 border-t border-zinc-800 pt-2">
       <div className="flex items-end gap-2">
         <span className="w-10 text-sm text-zinc-500">Set {set.setNumber}</span>
-        <Input type="number" placeholder="kg" value={load} onChange={(e) => { setLoad(e.target.value); markDirty(); }} className="w-20" />
+        <Input type="number" placeholder={loadType === "assisted" ? "assist kg" : "kg"} value={load} onChange={(e) => { setLoad(e.target.value); markDirty(); }} className="w-20" />
         <Input type="number" placeholder="Reps" value={reps} onChange={(e) => { setReps(e.target.value); markDirty(); }} className="w-16" />
         <Input type="number" placeholder="RIR" value={rir} onChange={(e) => { setRir(e.target.value); markDirty(); }} className="w-16" />
         <Button variant="secondary" onClick={save} disabled={status === "saving"}>
@@ -100,7 +101,7 @@ export function SessionSummaryView({
             </span>
           </div>
           {performance.loggedSets.map((set) => (
-            <SetRow key={set.id} set={set} />
+            <SetRow key={set.id} set={set} loadType={performance.loadType} />
           ))}
         </div>
       ))}

@@ -55,6 +55,7 @@ export async function generateProgram(db: Database, userId: string): Promise<Gen
 
   const experienceLevel = training.experienceLevel as ExperienceLevel;
   const equipment = training.equipment as Equipment[];
+  const restrictionKeys = training.restrictionKeys;
 
   const { splitType, sessions } = selectSplit(training.sessionsPerWeek);
   const weeklyVolumeTargets = deriveWeeklyVolumeTargets(experienceLevel, strategy.priorityMuscles);
@@ -66,6 +67,7 @@ export async function generateProgram(db: Database, userId: string): Promise<Gen
       sessionLabel,
       experienceLevel,
       equipment,
+      restrictionKeys,
     });
     const exercises = allocateSession({
       sessionLabel,
@@ -83,6 +85,7 @@ export async function generateProgram(db: Database, userId: string): Promise<Gen
     sessionDurationMinutes: training.sessionDurationMinutes,
     equipment,
     experienceLevel,
+    restrictionKeys,
     roleRulesRevisionId: roleRules.revisionId,
     workouts,
   };

@@ -134,4 +134,24 @@ describe("exerciseCatalog", () => {
       ).rejects.toThrow(/Preferred role must be one of the allowed roles/);
     });
   });
+
+  describe("load type", () => {
+    it("defaults to external, and stores assisted when given", async () => {
+      expect((await createExercise(db, validInput))!.loadType).toBe("external");
+      const assisted = await createExercise(db, { ...validInput, canonicalId: "assisted_pull_up", loadType: "assisted" });
+      expect(assisted!.loadType).toBe("assisted");
+    });
+
+    it("leaves the load type unchanged when an update omits it, and changes it when given", async () => {
+      const created = await createExercise(db, { ...validInput, loadType: "assisted" });
+      const { canonicalId: _id, ...updateFields } = validInput;
+      void _id;
+      expect((await updateExercise(db, created!.id, { ...updateFields, name: "Renamed" }))!.loadType).toBe("assisted");
+      expect((await updateExercise(db, created!.id, { ...updateFields, loadType: "external" }))!.loadType).toBe("external");
+    });
+
+    it("rejects an unknown load type", async () => {
+      await expect(createExercise(db, { ...validInput, loadType: "magic" as never })).rejects.toThrow();
+    });
+  });
 });
